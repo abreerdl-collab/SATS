@@ -363,10 +363,19 @@
 
     .app-selector-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 18px;
-      max-width: 900px;
+      max-width: 1080px;
       margin: 0 auto;
+    }
+
+    .app-selector-secondary-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 360px);
+      justify-content: center;
+      gap: 18px;
+      max-width: 1080px;
+      margin: 18px auto 0;
     }
 
     .app-choice-card {
@@ -400,6 +409,10 @@
       background: #0f766e;
     }
 
+    .app-choice-card[data-app-choice="documentAutomation"]::before {
+      background: #f59e0b;
+    }
+
     .app-choice-card:hover,
     .app-choice-card:focus-visible {
       outline: none;
@@ -411,6 +424,11 @@
     .app-choice-card[data-app-choice="procedures"]:hover,
     .app-choice-card[data-app-choice="procedures"]:focus-visible {
       border-color: #5eead4;
+    }
+
+    .app-choice-card[data-app-choice="documentAutomation"]:hover,
+    .app-choice-card[data-app-choice="documentAutomation"]:focus-visible {
+      border-color: #fbbf24;
     }
 
     .app-choice-icon {
@@ -426,6 +444,11 @@
     .app-choice-card[data-app-choice="procedures"] .app-choice-icon {
       background: #ccfbf1;
       color: #0f766e;
+    }
+
+    .app-choice-card[data-app-choice="documentAutomation"] .app-choice-icon {
+      background: #fef3c7;
+      color: #b45309;
     }
 
     .app-choice-icon .icon {
@@ -461,6 +484,24 @@
       color: #0f766e;
     }
 
+    .app-choice-card[data-app-choice="documentAutomation"] .app-choice-open {
+      color: #b45309;
+    }
+
+    .app-choice-badge {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      border-radius: 999px;
+      background: #f59e0b;
+      color: #111827;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
     .portal-logo-small {
       width: 54px;
       height: 54px;
@@ -480,6 +521,395 @@
       height: 100vh;
       border: 0;
       background: #f0f4f8;
+    }
+
+    .document-automation-screen {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.16), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    .document-automation-shell {
+      --automation-yellow: #f59e0b;
+      --automation-yellow-soft: #fef3c7;
+      width: min(1480px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 20px 0 48px;
+    }
+
+    .document-automation-topbar,
+    .document-automation-actions,
+    .document-automation-stepper,
+    .document-automation-type-grid,
+    .document-automation-project-actions,
+    .document-automation-validation-list,
+    .document-automation-file-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .document-automation-topbar {
+      justify-content: space-between;
+      padding: 16px 0 20px;
+    }
+
+    .document-automation-title h1,
+    .document-automation-title p {
+      margin: 0;
+    }
+
+    .document-automation-title h1 {
+      font-size: 26px;
+      line-height: 1.15;
+    }
+
+    .document-automation-title p {
+      margin-top: 5px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .document-automation-badge {
+      display: inline-flex;
+      align-items: center;
+      width: max-content;
+      border-radius: 999px;
+      background: var(--amber-bg);
+      color: var(--amber-text);
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .document-automation-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .document-automation-card,
+    .document-automation-panel,
+    .document-automation-project-card,
+    .document-automation-upload,
+    .document-automation-risk-card,
+    .document-automation-preview,
+    .document-automation-blocked {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .document-automation-card,
+    .document-automation-panel,
+    .document-automation-blocked {
+      padding: 18px;
+    }
+
+    .document-automation-blocked {
+      width: min(720px, calc(100% - 32px));
+      margin: 80px auto 0;
+      text-align: center;
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+    }
+
+    .document-automation-blocked h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .document-automation-blocked p {
+      margin: 0;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .document-automation-sidebar,
+    .document-automation-main,
+    .document-automation-project-list,
+    .document-automation-upload-grid,
+    .document-automation-field-grid,
+    .document-automation-risk-list,
+    .document-automation-revision-list,
+    .document-automation-preview-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .document-automation-layout .document-automation-main {
+      gap: 16px;
+    }
+
+    .document-automation-project-list {
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .document-automation-project-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      text-align: left;
+    }
+
+    .document-automation-project-card h3,
+    .document-automation-risk-card h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .document-automation-project-card p,
+    .document-automation-project-card small {
+      margin: 0;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .document-automation-stepper {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .document-automation-step {
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .document-automation-step.is-active {
+      border-color: #f59e0b;
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .document-automation-type-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .document-automation-type-card {
+      min-height: 150px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 16px;
+      text-align: left;
+    }
+
+    .document-automation-type-card.is-available {
+      border-color: #f59e0b;
+      background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+    }
+
+    .document-automation-type-card.is-locked {
+      opacity: 0.62;
+      cursor: not-allowed;
+    }
+
+    .document-automation-upload-grid,
+    .document-automation-field-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .document-automation-upload {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .document-automation-upload input[type="file"] {
+      width: 100%;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      padding: 12px;
+    }
+
+    .document-automation-file-row {
+      justify-content: space-between;
+      border-radius: 7px;
+      background: var(--surface-soft);
+      padding: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .document-automation-risk-raw-block {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 14px;
+    }
+
+    .document-automation-risk-raw-block header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .document-automation-risk-raw-block header span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .document-automation-risk-raw-block textarea {
+      min-height: 240px;
+      font-family: Arial, sans-serif;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .document-automation-risk-raw-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .document-automation-field-grid .field.is-wide,
+    .document-automation-upload.is-wide,
+    .document-automation-preview.is-wide {
+      grid-column: 1 / -1;
+    }
+
+    .document-automation-confidence {
+      display: inline-flex;
+      width: max-content;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .document-automation-confidence[data-confidence="high"] {
+      background: var(--green-bg);
+      color: var(--green-text);
+    }
+
+    .document-automation-confidence[data-confidence="medium"] {
+      background: var(--amber-bg);
+      color: var(--amber-text);
+    }
+
+    .document-automation-confidence[data-confidence="missing"],
+    .document-automation-confidence[data-confidence="low"] {
+      background: var(--red-bg);
+      color: var(--red-text);
+    }
+
+    .document-automation-validation {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      background: #fffbeb;
+      color: #92400e;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .document-automation-validation-list {
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .document-automation-validation span {
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.16);
+      padding: 5px 9px;
+    }
+
+    .document-automation-risk-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .document-automation-risk-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .document-automation-risk-meta span {
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .document-automation-preview {
+      padding: 18px;
+      overflow: auto;
+      max-height: 680px;
+    }
+
+    .document-automation-preview .ltcat-word-document {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #fff;
+      color: #111827;
+      padding: 28px;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+    }
+
+    .document-automation-preview table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .document-automation-preview th,
+    .document-automation-preview td {
+      border: 1px solid #cbd5e1;
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    .document-automation-preview th {
+      background: #e2e8f0;
+    }
+
+    .document-automation-empty {
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      padding: 18px;
+      text-align: center;
+      font-weight: 750;
+    }
+
+    .document-automation-yellow-card {
+      border-color: #f59e0b;
+      background: #fffbeb;
     }
 
     .admin-mode-fab {
@@ -546,7 +976,7 @@
 
     .app-selector-grid.has-management {
       max-width: 1080px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     }
 
     .app-choice-card[data-app-choice="management"]::before {
@@ -1143,6 +1573,60 @@
       color: #c4b5fd;
     }
 
+    html[data-theme="dark"] .app-choice-card[data-app-choice="documentAutomation"] .app-choice-icon {
+      background: #422006;
+      color: #fbbf24;
+    }
+
+    html[data-theme="dark"] .app-choice-badge {
+      background: #fbbf24;
+      color: #1f2937;
+    }
+
+    html[data-theme="dark"] .document-automation-card,
+    html[data-theme="dark"] .document-automation-panel,
+    html[data-theme="dark"] .document-automation-project-card,
+    html[data-theme="dark"] .document-automation-upload,
+    html[data-theme="dark"] .document-automation-risk-card,
+    html[data-theme="dark"] .document-automation-risk-raw-block,
+    html[data-theme="dark"] .document-automation-blocked,
+    html[data-theme="dark"] .document-automation-stepper {
+      background: #0f172a;
+      border-color: #334155;
+      box-shadow: none;
+    }
+
+    html[data-theme="dark"] .document-automation-type-card {
+      background: #0f172a;
+      border-color: #334155;
+    }
+
+    html[data-theme="dark"] .document-automation-type-card.is-available,
+    html[data-theme="dark"] .document-automation-yellow-card {
+      background: #1f2937;
+      border-color: #f59e0b;
+    }
+
+    html[data-theme="dark"] .document-automation-step.is-active {
+      background: #422006;
+      color: #fcd34d;
+      border-color: #f59e0b;
+    }
+
+    html[data-theme="dark"] .document-automation-file-row,
+    html[data-theme="dark"] .document-automation-upload input[type="file"],
+    html[data-theme="dark"] .document-automation-risk-meta span,
+    html[data-theme="dark"] .document-automation-empty {
+      background: #111827;
+      border-color: #334155;
+    }
+
+    html[data-theme="dark"] .document-automation-validation {
+      background: #422006;
+      border-color: #92400e;
+      color: #fcd34d;
+    }
+
     @media (max-width: 760px) {
       .app-selector-shell {
         width: min(100% - 20px, 1080px);
@@ -1193,6 +1677,22 @@
 
       .management-shell {
         width: min(100% - 20px, 1440px);
+      }
+
+      .document-automation-shell {
+        width: min(100% - 20px, 1480px);
+      }
+
+      .document-automation-layout,
+      .document-automation-type-grid,
+      .document-automation-upload-grid,
+      .document-automation-field-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .document-automation-topbar {
+        align-items: flex-start;
+        flex-direction: column;
       }
 
       .management-topbar {
@@ -5150,6 +5650,18 @@
         <span class="management-app-card-mount" id="managementAppCardMount"></span>
       </section>
 
+      <section class="app-selector-secondary-grid" aria-label="Aplicativos secundários">
+        <button class="app-choice-card" type="button" data-app-choice="documentAutomation">
+          <span class="app-choice-icon" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h5"/><path d="M8 17h8"/><path d="m16 13 2 2 3-4"/></svg>
+          </span>
+          <span class="app-choice-badge">Beta</span>
+          <strong>Automação de Documentos</strong>
+          <p>Gere LTCAT, PGR e PCMSO a partir de arquivos do SOC.</p>
+          <span class="app-choice-open">Abrir beta <span aria-hidden="true">→</span></span>
+        </button>
+      </section>
+
       <section class="suggestion-weekly-ranking hidden" id="suggestionWeeklyRanking" aria-labelledby="suggestionWeeklyRankingTitle">
         <h2 id="suggestionWeeklyRankingTitle">Top sugestões da semana</h2>
         <div class="suggestion-ranking-list" id="suggestionWeeklyRankingList"></div>
@@ -5186,6 +5698,10 @@
         </div>
       </section>
     </div>
+  </main>
+
+  <main id="documentAutomationScreen" class="screen document-automation-screen hidden">
+    <div id="documentAutomationRoot"></div>
   </main>
 
   <main id="proceduresScreen" class="screen procedures-screen hidden">
@@ -6153,6 +6669,10 @@
         "Adicionou acesso", "Editou acesso", "Removeu acesso", "Criou backup", "Restaurou backup",
         "Importou backup", "Exportou backup", "Alterou configuração", "Ativou modo manutenção",
         "Desativou modo manutenção", "Alterou contrato", "Rodou diagnóstico", "Reparou dados",
+        "Acessou Automação de Documentos", "Tentou acessar Automação de Documentos",
+        "Criou projeto de automação", "Enviou arquivo SOC", "Extraiu dados do SOC",
+        "Editou campos extraídos", "Gerou Word da automação", "Salvou projeto de automação",
+        "Excluiu projeto de automação",
         RESTRICTED_ATTEMPT_ACTION
       ]);
       const DEFAULT_FOLDER_ID = "default-folder";
@@ -6190,6 +6710,8 @@
       const RESTRICTED_ADMIN_EMAILS = new Set(["administrativo@protege.med.br"]);
       const IMPROVEMENTS_OWNER_EMAIL = "abner.l@outlook.com";
       const SUPER_ADMIN_EMAIL = "abner.l@outlook.com";
+      const DOCUMENT_AUTOMATION_OWNER_EMAIL = "abner.l@outlook.com";
+      const DOCUMENT_AUTOMATION_MAX_FILE_BYTES = 10 * 1024 * 1024;
       const MANAGEMENT_PHASE_1_EMAILS = new Set([SUPER_ADMIN_EMAIL, "administrativo@protege.med.br"]);
       const MANAGEMENT_PERMISSION_KEYS = [
         "accessManagement", "phase1View", "manageSuggestions", "viewActivity", "deleteLogs",
@@ -6297,6 +6819,9 @@
       let richToolbarUserMoved = false;
       let richToolbarDragState = null;
       let selectedPortalApp = null;
+      let activeDocumentAutomationProjectId = "";
+      let documentAutomationDraft = null;
+      let activeDocumentAutomationStep = "type";
       let adminModeEnabled = sessionStorage.getItem(ADMIN_MODE_SESSION_KEY) === "on";
       let activeManagementTab = "dashboard";
       let activeProcedureAdminView = "overview";
@@ -6342,6 +6867,8 @@
         managementPermissionCheckboxes: document.getElementById("managementPermissionCheckboxes"),
         actionPlanTemplateForm: document.getElementById("actionPlanTemplateForm"),
         actionPlanTemplateEditorAreas: document.getElementById("actionPlanTemplateEditorAreas"),
+        documentAutomationScreen: document.getElementById("documentAutomationScreen"),
+        documentAutomationRoot: document.getElementById("documentAutomationRoot"),
         proceduresScreen: document.getElementById("proceduresScreen"),
         proceduresFrame: document.getElementById("proceduresFrame"),
         profileScreen: document.getElementById("profileScreen"),
@@ -6531,6 +7058,10 @@
 
       function normalizeEmail(email) {
         return String(email || "").trim().toLocaleLowerCase("pt-BR");
+      }
+
+      function canAccessDocumentAutomation(user = currentUser) {
+        return !!user && normalizeEmail(user.email) === normalizeEmail(DOCUMENT_AUTOMATION_OWNER_EMAIL);
       }
 
       function canAccessManagementPhase1(user = currentUser) {
@@ -8354,6 +8885,7 @@
           backupCenter: normalizeBackupCenter(),
           auditTrail: [],
           systemSettings: createDefaultSystemSettings(),
+          documentAutomation: normalizeDocumentAutomation(),
           profiles: []
         };
       }
@@ -8377,11 +8909,180 @@
           backupCenter: normalizeBackupCenter(raw.backupCenter || raw.backup_center),
           auditTrail: normalizeAuditTrail(raw.auditTrail || raw.audit_trail),
           systemSettings: normalizeSystemSettings(raw.systemSettings || raw.system_settings),
+          documentAutomation: normalizeDocumentAutomation(raw.documentAutomation || raw.document_automation),
           profiles: Array.isArray(raw.profiles) ? raw.profiles : []
         };
 
         appData.profiles = appData.profiles.map(profile => normalizeProfile(profile));
         return ensureDefaultClientStructure(appData);
+      }
+
+      function normalizeDocumentAutomation(raw = {}) {
+        const settings = raw.settings || {};
+        return {
+          schemaVersion: Number(raw.schemaVersion || raw.schema_version || 1),
+          projects: Array.isArray(raw.projects) ? raw.projects.map(normalizeDocumentAutomationProject) : [],
+          templates: Array.isArray(raw.templates) ? raw.templates : [],
+          settings: {
+            activeDocumentTypes: Array.isArray(settings.activeDocumentTypes) ? settings.activeDocumentTypes : ["ltcat"],
+            maxFileSizeMb: Number(settings.maxFileSizeMb || 10),
+            allowDocxGeneration: settings.allowDocxGeneration !== false,
+            allowHtmlWordFallback: settings.allowHtmlWordFallback !== false
+          }
+        };
+      }
+
+      function normalizeDocumentAutomationProject(project = {}) {
+        const now = new Date().toISOString();
+        const sourceFiles = project.sourceFiles || {};
+        const validation = project.validation || {};
+        const generated = project.generated || {};
+        return {
+          ...project,
+          id: project.id || createId(),
+          type: project.type || "ltcat",
+          status: ["draft", "review", "generated", "archived"].includes(project.status) ? project.status : "draft",
+          title: project.title || "",
+          companyName: project.companyName || project.company || project.extractedData?.companyName || "",
+          unitName: project.unitName || project.extractedData?.unitName || "",
+          createdAt: project.createdAt || now,
+          updatedAt: project.updatedAt || project.createdAt || now,
+          createdBy: project.createdBy || "",
+          updatedBy: project.updatedBy || "",
+          sourceFiles: {
+            socFile: normalizeDocumentAutomationFile(sourceFiles.socFile),
+            templateFile: normalizeDocumentAutomationFile(sourceFiles.templateFile),
+            previousDocumentFile: normalizeDocumentAutomationFile(sourceFiles.previousDocumentFile),
+            companyLogo: normalizeDocumentAutomationFile(sourceFiles.companyLogo)
+          },
+          extractedData: normalizeLtcatExtractedData(project.extractedData || {}),
+          manualFields: normalizeLtcatManualFields(project.manualFields || {}),
+          validation: {
+            missingFields: Array.isArray(validation.missingFields) ? validation.missingFields : [],
+            warnings: Array.isArray(validation.warnings) ? validation.warnings : [],
+            confidence: validation.confidence && typeof validation.confidence === "object" ? validation.confidence : {}
+          },
+          generated: {
+            htmlPreview: generated.htmlPreview || "",
+            lastGeneratedAt: generated.lastGeneratedAt || "",
+            fileName: generated.fileName || ""
+          }
+        };
+      }
+
+      function normalizeDocumentAutomationFile(file) {
+        if (!file) return null;
+        return {
+          id: file.id || createId(),
+          name: file.name || "",
+          type: file.type || "",
+          size: Number(file.size || 0),
+          dataUrl: file.dataUrl || "",
+          text: file.text || "",
+          uploadedAt: file.uploadedAt || new Date().toISOString(),
+          uploadedBy: file.uploadedBy || ""
+        };
+      }
+
+      function normalizeLtcatExtractedData(data = {}) {
+        return {
+          companyName: data.companyName || "",
+          unitName: data.unitName || "",
+          cnpj: data.cnpj || "",
+          address: data.address || "",
+          cep: data.cep || "",
+          city: data.city || "",
+          state: data.state || "",
+          cnae: data.cnae || "",
+          riskDegree: data.riskDegree || "",
+          issueDate: data.issueDate || "",
+          documentType: data.documentType || "LTCAT",
+          technicalResponsible: data.technicalResponsible || "",
+          hierarchy: {
+            sectors: Array.isArray(data.hierarchy?.sectors) ? data.hierarchy.sectors : [],
+            roles: Array.isArray(data.hierarchy?.roles) ? data.hierarchy.roles : []
+          },
+          risks: Array.isArray(data.risks) ? data.risks.map(normalizeLtcatRisk) : [],
+          synthesis: Array.isArray(data.synthesis) ? data.synthesis : [],
+          rawSocText: data.rawSocText || data.rawText || "",
+          rawRiskSection: data.rawRiskSection || "",
+          riskSectorBlocks: Array.isArray(data.riskSectorBlocks) ? data.riskSectorBlocks.map(normalizeLtcatRawRiskSectorBlock) : [],
+          synthesisRawText: data.synthesisRawText || "",
+          rawRiskWarning: data.rawRiskWarning || "",
+          riskExtractionWarnings: Array.isArray(data.riskExtractionWarnings) ? data.riskExtractionWarnings : [],
+          extractionDebug: data.extractionDebug && typeof data.extractionDebug === "object" ? data.extractionDebug : {},
+          rawText: data.rawText || ""
+        };
+      }
+
+      function normalizeLtcatRawRiskSectorBlock(block = {}, index = 0) {
+        return {
+          id: block.id || createId(),
+          title: block.title || `Setor ${index + 1}`,
+          rawText: block.rawText || "",
+          order: Number(block.order || index + 1),
+          extractedAt: block.extractedAt || ""
+        };
+      }
+
+      function normalizeLtcatRisk(risk = {}) {
+        const medicao = risk.medicao || {};
+        return {
+          setor: risk.setor || "",
+          cargo: risk.cargo || "",
+          grupo: risk.grupo || "",
+          codigoESocial: risk.codigoESocial || "",
+          perigo: risk.perigo || risk.risco || "",
+          descricao: risk.descricao || "",
+          fundamentacaoLegal: risk.fundamentacaoLegal || "",
+          possiveisLesoes: risk.possiveisLesoes || "",
+          fontesCircunstancias: risk.fontesCircunstancias || "",
+          meioPropagacao: risk.meioPropagacao || "",
+          criterioAvaliacao: risk.criterioAvaliacao || "",
+          perfilExposicao: risk.perfilExposicao || "",
+          probabilidade: risk.probabilidade || "",
+          gravidade: risk.gravidade || "",
+          nivelRisco: risk.nivelRisco || "",
+          classificacao: risk.classificacao || "",
+          medicao: {
+            empresa: medicao.empresa || "",
+            tecnica: medicao.tecnica || "",
+            equipamento: medicao.equipamento || "",
+            data: medicao.data || "",
+            valor: medicao.valor || "",
+            nivelAcao: medicao.nivelAcao || "",
+            limiteTolerancia: medicao.limiteTolerancia || ""
+          },
+          prevencaoControle: risk.prevencaoControle || "",
+          parecerTecnico: risk.parecerTecnico || "",
+          conclusaoAposentadoria: risk.conclusaoAposentadoria || ""
+        };
+      }
+
+      function normalizeLtcatManualFields(fields = {}) {
+        return {
+          finalCompanyName: fields.finalCompanyName || "",
+          unitName: fields.unitName || "",
+          emissionMonth: fields.emissionMonth || "",
+          emissionYear: fields.emissionYear || "",
+          city: fields.city || "",
+          elaboratedBy: fields.elaboratedBy || "",
+          responsibleRole: fields.responsibleRole || "",
+          councilNumber: fields.councilNumber || "",
+          cpf: fields.cpf || "",
+          specialty: fields.specialty || "",
+          generalNotes: fields.generalNotes || "",
+          generalConclusion: fields.generalConclusion || "",
+          revisionDescription: fields.revisionDescription || "",
+          currentRevisionDate: fields.currentRevisionDate || "",
+          revisionHistory: Array.isArray(fields.revisionHistory) && fields.revisionHistory.length
+            ? fields.revisionHistory.map(item => ({
+              revision: item.revision || "",
+              date: item.date || "",
+              description: item.description || ""
+            }))
+            : [{ revision: "00", date: "", description: "Emissão inicial do LTCAT." }]
+        };
       }
 
       function normalizeManagementPermissions(raw) {
@@ -9269,6 +9970,7 @@
         if (showAuth) {
           selectedPortalApp = null;
           els.appSelectorScreen.classList.add("hidden");
+          els.documentAutomationScreen.classList.add("hidden");
           els.proceduresScreen.classList.add("hidden");
           els.managementScreen.classList.add("hidden");
           els.profileScreen.classList.add("hidden");
@@ -9277,14 +9979,16 @@
           return;
         }
         if (renderMaintenanceGate()) {
-          [els.appSelectorScreen, els.proceduresScreen, els.managementScreen, els.profileScreen, els.folderScreen, els.editorScreen].forEach(screen => screen.classList.add("hidden"));
+          [els.appSelectorScreen, els.documentAutomationScreen, els.proceduresScreen, els.managementScreen, els.profileScreen, els.folderScreen, els.editorScreen].forEach(screen => screen.classList.add("hidden"));
           return;
         }
 
         const showSelector = !selectedPortalApp;
+        const showDocumentAutomation = selectedPortalApp === "documentAutomation";
         const showProcedures = selectedPortalApp === "procedures";
         const showManagement = selectedPortalApp === "management";
         els.appSelectorScreen.classList.toggle("hidden", !showSelector);
+        els.documentAutomationScreen.classList.toggle("hidden", !showDocumentAutomation);
         els.proceduresScreen.classList.toggle("hidden", !showProcedures);
         els.managementScreen.classList.toggle("hidden", !showManagement);
         if (showSelector) {
@@ -9298,6 +10002,7 @@
         }
 
         if (showProcedures) {
+          els.documentAutomationScreen.classList.add("hidden");
           els.managementScreen.classList.add("hidden");
           els.profileScreen.classList.add("hidden");
           els.folderScreen.classList.add("hidden");
@@ -9315,11 +10020,23 @@
             return;
           }
           els.profileScreen.classList.add("hidden");
+          els.documentAutomationScreen.classList.add("hidden");
           els.folderScreen.classList.add("hidden");
           els.editorScreen.classList.add("hidden");
           hideFolderContextMenu();
           hideRichToolbar();
           renderManagement();
+          return;
+        }
+
+        if (showDocumentAutomation) {
+          els.managementScreen.classList.add("hidden");
+          els.profileScreen.classList.add("hidden");
+          els.folderScreen.classList.add("hidden");
+          els.editorScreen.classList.add("hidden");
+          hideFolderContextMenu();
+          hideRichToolbar();
+          renderDocumentAutomation();
           return;
         }
 
@@ -9387,6 +10104,1894 @@
           <span class="app-choice-open">Abrir aplicativo <span aria-hidden="true">→</span></span>`;
         card.addEventListener("click", handleAppChoice);
         els.managementAppCardMount.appendChild(card);
+      }
+
+      function getDocumentAutomation() {
+        app.documentAutomation = normalizeDocumentAutomation(app.documentAutomation);
+        return app.documentAutomation;
+      }
+
+      function createDocumentAutomationProject(seed = {}) {
+        const now = new Date().toISOString();
+        return normalizeDocumentAutomationProject({
+          id: createId(),
+          type: seed.type || "ltcat",
+          status: "draft",
+          title: seed.title || "Novo LTCAT automatizado",
+          companyName: seed.companyName || "",
+          unitName: seed.unitName || "",
+          createdAt: now,
+          updatedAt: now,
+          createdBy: currentUser?.email || "",
+          updatedBy: currentUser?.email || "",
+          sourceFiles: {},
+          extractedData: {},
+          manualFields: {},
+          validation: {},
+          generated: {}
+        });
+      }
+
+      function getActiveDocumentAutomationProject() {
+        const state = getDocumentAutomation();
+        if (activeDocumentAutomationProjectId) {
+          const saved = state.projects.find(project => project.id === activeDocumentAutomationProjectId);
+          if (saved) {
+            documentAutomationDraft = JSON.parse(JSON.stringify(saved));
+            return documentAutomationDraft;
+          }
+        }
+        if (!documentAutomationDraft) documentAutomationDraft = createDocumentAutomationProject();
+        return documentAutomationDraft;
+      }
+
+      function setDocumentAutomationDraft(project) {
+        documentAutomationDraft = normalizeDocumentAutomationProject(project);
+        activeDocumentAutomationProjectId = documentAutomationDraft.id;
+        return documentAutomationDraft;
+      }
+
+      function renderDocumentAutomation() {
+        if (!els.documentAutomationRoot) return;
+        if (!canAccessDocumentAutomation()) {
+          renderDocumentAutomationBlocked();
+          return;
+        }
+        const project = getActiveDocumentAutomationProject();
+        els.documentAutomationRoot.innerHTML = `
+          <section class="document-automation-shell">
+            <header class="document-automation-topbar">
+              <div class="document-automation-title">
+                <span class="document-automation-badge">LTCAT Beta</span>
+                <h1>Automação de Documentos</h1>
+                <p>Transforme documentos brutos do SOC em modelos prontos da eProtege.</p>
+              </div>
+              <div class="document-automation-actions">
+                <button class="button" type="button" data-doc-action="new-project">Novo projeto</button>
+                <button class="button" type="button" data-doc-action="save-project">Salvar projeto</button>
+                <button class="button primary" type="button" data-doc-action="generate-word">Gerar Word</button>
+                <button class="button" type="button" data-doc-action="back-apps">Voltar aos aplicativos</button>
+              </div>
+            </header>
+            <div class="document-automation-layout">
+              <aside class="document-automation-sidebar">
+                ${renderDocumentAutomationProjects()}
+                ${renderDocumentAutomationQuickStats(project)}
+              </aside>
+              <section class="document-automation-main">
+                ${renderDocumentAutomationStepper()}
+                ${renderDocumentAutomationStepContent(project)}
+              </section>
+            </div>
+          </section>`;
+        bindDocumentAutomationEvents();
+      }
+
+      function renderDocumentAutomationBlocked() {
+        els.documentAutomationRoot.innerHTML = `
+          <section class="document-automation-blocked">
+            <span class="document-automation-badge">Beta</span>
+            <h1>Automação de Documentos</h1>
+            <h2>Em Desenvolvimento, volte mais tarde.</h2>
+            <p>Esta função está sendo testada e será liberada futuramente.</p>
+            <button class="button primary" type="button" data-doc-action="back-apps">Voltar aos aplicativos</button>
+          </section>`;
+        bindDocumentAutomationEvents();
+      }
+
+      function renderDocumentAutomationProjects() {
+        const projects = getDocumentAutomation().projects
+          .slice()
+          .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+        return `
+          <section class="document-automation-card">
+            <div class="management-panel-head">
+              <div><h2>Meus documentos automatizados</h2><small>${projects.length} projeto(s) salvo(s)</small></div>
+            </div>
+            <div class="document-automation-project-list">
+              ${projects.map(project => `
+                <article class="document-automation-project-card ${project.id === activeDocumentAutomationProjectId ? "document-automation-yellow-card" : ""}">
+                  <h3>${escapeHtml(project.title || "LTCAT sem título")}</h3>
+                  <p>${escapeHtml(project.companyName || project.extractedData.companyName || "Empresa não informada")}</p>
+                  <small>${escapeHtml(project.type.toUpperCase())} · ${escapeHtml(project.status)} · ${escapeHtml(formatDateTime(project.updatedAt))}</small>
+                  <div class="document-automation-project-actions">
+                    <button class="button" type="button" data-doc-action="open-project" data-project-id="${escapeAttr(project.id)}">Continuar</button>
+                    <button class="button" type="button" data-doc-action="duplicate-project" data-project-id="${escapeAttr(project.id)}">Duplicar</button>
+                    <button class="button danger" type="button" data-doc-action="delete-project" data-project-id="${escapeAttr(project.id)}">Excluir</button>
+                  </div>
+                </article>`).join("") || '<div class="document-automation-empty">Nenhum projeto salvo ainda.</div>'}
+            </div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationQuickStats(project) {
+        const risks = project.extractedData?.risks || [];
+        const missing = project.validation?.missingFields || [];
+        return `
+          <section class="document-automation-card">
+            <h2>Resumo do projeto</h2>
+            <p><strong>Tipo:</strong> ${escapeHtml(project.type.toUpperCase())}</p>
+            <p><strong>Empresa:</strong> ${escapeHtml(project.companyName || project.extractedData.companyName || "-")}</p>
+            <p><strong>Riscos extraídos:</strong> ${risks.length}</p>
+            <p><strong>Pendências:</strong> ${missing.length}</p>
+          </section>`;
+      }
+
+      function renderDocumentAutomationStepper() {
+        const steps = [
+          ["type", "1. Tipo"],
+          ["upload", "2. Upload"],
+          ["extract", "3. Extração"],
+          ["review", "4. Revisão"],
+          ["complements", "5. Complementos"],
+          ["preview", "6. Prévia"],
+          ["generate", "7. Gerar Word"]
+        ];
+        return `<nav class="document-automation-stepper" aria-label="Etapas da Automação">${steps.map(([id, label]) => `
+          <button class="document-automation-step ${activeDocumentAutomationStep === id ? "is-active" : ""}" type="button" data-doc-step="${id}">${escapeHtml(label)}</button>
+        `).join("")}</nav>`;
+      }
+
+      function renderDocumentAutomationStepContent(project) {
+        if (activeDocumentAutomationStep === "type") return renderDocumentAutomationTypeStep(project);
+        if (activeDocumentAutomationStep === "upload") return renderDocumentAutomationUploadStep(project);
+        if (activeDocumentAutomationStep === "extract") return renderDocumentAutomationExtractStep(project);
+        if (activeDocumentAutomationStep === "review") return renderDocumentAutomationReviewStep(project);
+        if (activeDocumentAutomationStep === "complements") return renderDocumentAutomationComplementsStep(project);
+        if (activeDocumentAutomationStep === "preview") return renderDocumentAutomationPreviewStep(project);
+        return renderDocumentAutomationGenerateStep(project);
+      }
+
+      function renderDocumentAutomationTypeStep(project) {
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Tipo de documento</h2><small>Fase 1 liberada apenas para LTCAT.</small></div></div>
+            <div class="document-automation-type-grid">
+              <button class="document-automation-type-card is-available" type="button" data-doc-action="select-type" data-doc-type="ltcat">
+                <span class="document-automation-badge">Disponível</span>
+                <strong>LTCAT</strong>
+                <p>Gere o Laudo Técnico das Condições Ambientais do Trabalho a partir do documento bruto do SOC.</p>
+              </button>
+              <button class="document-automation-type-card is-locked" type="button" data-doc-action="locked-type">
+                <span class="document-automation-badge">Em breve</span>
+                <strong>PGR</strong>
+                <p>Estrutura preparada para fase futura.</p>
+              </button>
+              <button class="document-automation-type-card is-locked" type="button" data-doc-action="locked-type">
+                <span class="document-automation-badge">Em breve</span>
+                <strong>PCMSO</strong>
+                <p>Estrutura preparada para fase futura.</p>
+              </button>
+            </div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationUploadStep(project) {
+        const files = project.sourceFiles || {};
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Upload dos arquivos</h2><small>Limite de 10 MB por arquivo. Arquivos são tratados como dados, sem execução.</small></div></div>
+            <div class="document-automation-upload-grid">
+              ${renderDocumentAutomationUpload("socFile", "Documento bruto gerado pelo SOC", "Envie aqui o arquivo que vem direto da plataforma SOC.", ".rtf,.doc,.docx,.txt,text/plain,application/rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.socFile, true)}
+              ${renderDocumentAutomationUpload("templateFile", "Modelo interno de LTCAT", "Modelo usado pela empresa para montar o documento final. Na fase 1 fica salvo como referência.", ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.templateFile)}
+              ${renderDocumentAutomationUpload("previousDocumentFile", "Documento do ano anterior", "Use para puxar datas, histórico de revisão e informações recorrentes, quando possível.", ".docx,.doc,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.previousDocumentFile)}
+              ${renderDocumentAutomationUpload("companyLogo", "Logo da empresa", "PNG ou JPEG para capa e cabeçalho do Word.", ".png,.jpg,.jpeg,image/png,image/jpeg", files.companyLogo)}
+            </div>
+            <div class="document-automation-actions" style="margin-top:14px">
+              <button class="button primary" type="button" data-doc-action="extract-soc">Extrair dados do SOC</button>
+              <button class="button" type="button" data-doc-step="review">Ir para revisão</button>
+            </div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationUpload(key, label, description, accept, file, required = false) {
+        return `
+          <label class="document-automation-upload ${key === "socFile" ? "is-wide" : ""}">
+            <strong>${escapeHtml(label)}${required ? " *" : ""}</strong>
+            <span>${escapeHtml(description)}</span>
+            <input type="file" data-doc-file="${escapeAttr(key)}" accept="${escapeAttr(accept)}">
+            ${file ? `<div class="document-automation-file-row"><span>${escapeHtml(file.name)} · ${escapeHtml(formatFileSize(file.size))}</span><button class="button" type="button" data-doc-action="remove-file" data-doc-file-key="${escapeAttr(key)}">Remover</button></div>` : ""}
+          </label>`;
+      }
+
+      function renderDocumentAutomationExtractStep(project) {
+        const data = project.extractedData || normalizeLtcatExtractedData();
+        const text = data.rawSocText || data.rawText || "";
+        const blocks = data.riskSectorBlocks || [];
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Extração automática</h2><small>Campos básicos são lidos por rótulo; riscos são copiados de SETOR até antes de Síntese.</small></div></div>
+            ${renderDocumentAutomationValidation(project)}
+            <div class="document-automation-preview is-wide">
+              <h3>Texto extraído do SOC</h3>
+              <pre style="white-space:pre-wrap; font:inherit; line-height:1.6; margin:0">${escapeHtml(text ? text.slice(0, 12000) : "Envie o RTF do SOC e clique em Extrair dados do SOC.")}</pre>
+            </div>
+            <div class="document-automation-preview is-wide">
+              <h3>Bloco técnico extraído do SOC</h3>
+              <p>${blocks.length ? `${blocks.length} setor(es) encontrado(s).` : "Nenhum setor extraído ainda."}</p>
+            </div>
+            ${renderLtcatExtractionDebug(data)}
+            <div class="document-automation-actions" style="margin-top:14px">
+              <button class="button primary" type="button" data-doc-action="extract-soc">Reprocessar extração</button>
+              <button class="button" type="button" data-doc-action="extract-risk-blocks">Extrair riscos do SOC</button>
+              <button class="button" type="button" data-doc-step="review">Revisar dados</button>
+            </div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationReviewStep(project) {
+        const data = project.extractedData || normalizeLtcatExtractedData();
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Revisão dos dados extraídos</h2><small>Edite os campos antes de gerar o Word.</small></div></div>
+            ${renderDocumentAutomationValidation(project)}
+            <div class="document-automation-field-grid">
+              ${renderAutomationTextField("companyName", "Empresa", data.companyName, project)}
+              ${renderAutomationTextField("unitName", "Unidade", data.unitName, project)}
+              ${renderAutomationTextField("cnpj", "CNPJ", data.cnpj, project)}
+              ${renderAutomationTextField("address", "Endereço", data.address, project)}
+              ${renderAutomationTextField("cep", "CEP", data.cep, project)}
+              ${renderAutomationTextField("city", "Cidade", data.city, project)}
+              ${renderAutomationTextField("state", "Estado", data.state, project)}
+              ${renderAutomationTextField("cnae", "CNAE", data.cnae, project)}
+              ${renderAutomationTextField("riskDegree", "Grau de risco", data.riskDegree, project)}
+              ${renderAutomationTextField("issueDate", "Data de emissão SOC", data.issueDate, project)}
+              ${renderAutomationTextField("technicalResponsible", "Responsável técnico", data.technicalResponsible, project, true)}
+            </div>
+            <h3>Setores e cargos</h3>
+            <div class="document-automation-field-grid">
+              <label class="field is-wide">Setores encontrados<textarea data-doc-array="hierarchy.sectors" rows="3">${escapeHtml((data.hierarchy?.sectors || []).join("\\n"))}</textarea></label>
+              <label class="field is-wide">Cargos encontrados<textarea data-doc-array="hierarchy.roles" rows="3">${escapeHtml((data.hierarchy?.roles || []).join("\\n"))}</textarea></label>
+            </div>
+            ${renderLtcatRawRiskBlocksEditor(data.riskSectorBlocks || [])}
+          </section>`;
+      }
+
+      function renderLtcatRawRiskBlocksEditor(blocks) {
+        const count = blocks.length;
+        return `
+          <section class="document-automation-preview is-wide">
+            <div class="management-panel-head">
+              <div>
+                <h3>Bloco técnico extraído do SOC</h3>
+                <small>${count ? `${count} setor(es) encontrado(s). Revise o texto bruto antes de gerar o Word.` : "Nenhum bloco iniciado por SETOR foi extraído ainda."}</small>
+              </div>
+              <div class="management-item-actions">
+                <button class="button" type="button" data-doc-action="extract-risk-blocks">${count ? "Extrair riscos novamente" : "Extrair riscos do SOC"}</button>
+                <button class="button primary" type="button" data-doc-action="save-risk-review">Salvar revisão dos riscos</button>
+              </div>
+            </div>
+            <div class="document-automation-risk-list">
+              ${blocks.map((block, index) => `
+                <section class="document-automation-risk-raw-block">
+                  <header>
+                    <div>
+                      <strong>Setor: ${escapeHtml(block.title || `Setor ${index + 1}`)}</strong>
+                      <span>Bloco ${index + 1} de ${count}</span>
+                    </div>
+                    <div class="document-automation-risk-raw-actions">
+                      <button class="button" type="button" data-doc-action="move-risk-block-up" data-risk-index="${index}" ${index === 0 ? "disabled" : ""}>Subir</button>
+                      <button class="button" type="button" data-doc-action="move-risk-block-down" data-risk-index="${index}" ${index === count - 1 ? "disabled" : ""}>Descer</button>
+                      <button class="button" type="button" data-doc-action="duplicate-risk-block" data-risk-index="${index}">Duplicar</button>
+                      <button class="button danger" type="button" data-doc-action="delete-risk-block" data-risk-index="${index}">Excluir</button>
+                    </div>
+                  </header>
+                  <textarea data-doc-raw-risk="${index}" rows="14">${escapeHtml(block.rawText || "")}</textarea>
+                </section>`).join("") || '<div class="document-automation-empty">Use o botão "Extrair riscos do SOC" para copiar o trecho entre SETOR e antes de Síntese.</div>'}
+            </div>
+          </section>`;
+      }
+
+      function renderLtcatExtractionDebug(data = {}) {
+        const debug = data.extractionDebug || {};
+        const warnings = Array.isArray(data.riskExtractionWarnings) ? data.riskExtractionWarnings : [];
+        const sectorNames = Array.isArray(debug.sectorNames) ? debug.sectorNames : (data.riskSectorBlocks || []).map(block => block.title).filter(Boolean);
+        if (!Object.keys(debug).length && !warnings.length && !sectorNames.length) return "";
+        return `
+          <section class="document-automation-validation">
+            <strong>Debug da extração LTCAT</strong>
+            <div class="document-automation-validation-list">
+              <span>UNIDADE: ${debug.unidadeIndex >= 0 ? `linha ${debug.unidadeIndex + 1}` : "não encontrada"}</span>
+              <span>SETOR real: ${debug.startIndex >= 0 ? `linha ${debug.startIndex + 1}` : "não encontrado"}</span>
+              <span>Síntese: ${debug.sinteseIndex >= 0 ? `linha ${debug.sinteseIndex + 1}` : "não encontrada"}</span>
+              <span>Setores: ${Number(debug.sectorCount || sectorNames.length || 0)}</span>
+              ${debug.ignoredHierarchyHeader ? "<span>Cabeçalho Setor/Cargo/Funcionários ignorado</span>" : ""}
+              ${sectorNames.length ? `<span>${escapeHtml(sectorNames.join(" · "))}</span>` : ""}
+              ${warnings.map(warning => `<span>${escapeHtml(warning)}</span>`).join("")}
+            </div>
+          </section>`;
+      }
+
+      function renderAutomationTextField(name, label, value, project, wide = false) {
+        const confidence = project.validation?.confidence?.[name] || (value ? "medium" : "missing");
+        return `<label class="field ${wide ? "is-wide" : ""}">${escapeHtml(label)}
+          <span class="document-automation-confidence" data-confidence="${escapeAttr(confidence)}">${escapeHtml(confidenceLabel(confidence))}</span>
+          <input data-doc-extracted="${escapeAttr(name)}" value="${escapeAttr(value || "")}">
+        </label>`;
+      }
+
+      function renderAutomationRiskField(risk, index, field) {
+        const isLong = ["parecerTecnico", "conclusaoAposentadoria"].includes(field);
+        const className = isLong ? "field is-wide" : "field";
+        const value = risk[field] || "";
+        return `<label class="${className}">${escapeHtml(ltcatRiskFieldLabel(field))}
+          ${isLong
+            ? `<textarea data-doc-risk="${index}" data-doc-risk-field="${escapeAttr(field)}" rows="3">${escapeHtml(value)}</textarea>`
+            : `<input data-doc-risk="${index}" data-doc-risk-field="${escapeAttr(field)}" value="${escapeAttr(value)}">`}
+        </label>`;
+      }
+
+      function renderAutomationRisks(risks) {
+        if (!risks.length) return '<div class="document-automation-empty">Nenhum risco encontrado automaticamente. Você poderá complementar o documento manualmente.</div>';
+        return risks.map((risk, index) => `
+          <article class="document-automation-risk-card">
+            <div class="management-panel-head">
+              <div><h3>${escapeHtml(risk.perigo || `Risco ${index + 1}`)}</h3><small>${escapeHtml([risk.setor, risk.cargo].filter(Boolean).join(" · ") || "Setor/cargo não identificados")}</small></div>
+            </div>
+            <div class="document-automation-risk-meta">
+              <span>${escapeHtml(risk.grupo || "Grupo não identificado")}</span>
+              <span>eSocial: ${escapeHtml(risk.codigoESocial || "-")}</span>
+              <span>Nível: ${escapeHtml(risk.nivelRisco || "-")}</span>
+            </div>
+            <div class="document-automation-field-grid">
+              ${["setor", "cargo", "grupo", "codigoESocial", "perigo", "criterioAvaliacao", "perfilExposicao", "parecerTecnico", "conclusaoAposentadoria"].map(field => renderAutomationRiskField(risk, index, field)).join("")}
+            </div>
+          </article>`).join("");
+      }
+
+      function renderDocumentAutomationComplementsStep(project) {
+        const fields = project.manualFields || normalizeLtcatManualFields();
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Complementos manuais</h2><small>Esses campos complementam ou sobrescrevem os dados extraídos.</small></div></div>
+            <div class="document-automation-field-grid">
+              ${renderManualField("finalCompanyName", "Nome final da empresa", fields.finalCompanyName)}
+              ${renderManualField("unitName", "Unidade", fields.unitName)}
+              ${renderManualField("emissionMonth", "Mês de emissão", fields.emissionMonth)}
+              ${renderManualField("emissionYear", "Ano de emissão", fields.emissionYear)}
+              ${renderManualField("city", "Cidade", fields.city)}
+              ${renderManualField("elaboratedBy", "Elaborado por", fields.elaboratedBy)}
+              ${renderManualField("responsibleRole", "Cargo do responsável", fields.responsibleRole)}
+              ${renderManualField("councilNumber", "Número do conselho", fields.councilNumber)}
+              ${renderManualField("cpf", "CPF", fields.cpf)}
+              ${renderManualField("specialty", "Especialidade", fields.specialty)}
+              ${renderManualField("currentRevisionDate", "Data da revisão atual", fields.currentRevisionDate)}
+              ${renderManualField("revisionDescription", "Descrição da revisão", fields.revisionDescription, true)}
+              ${renderManualField("generalNotes", "Observações gerais", fields.generalNotes, true)}
+              ${renderManualField("generalConclusion", "Conclusão geral complementar", fields.generalConclusion, true)}
+            </div>
+            <h3>Histórico de revisões</h3>
+            <div class="document-automation-revision-list">
+              ${(fields.revisionHistory || []).map((row, index) => `
+                <div class="document-automation-field-grid">
+                  <label class="field">Revisão<input data-doc-revision="${index}" data-doc-revision-field="revision" value="${escapeAttr(row.revision)}"></label>
+                  <label class="field">Data<input data-doc-revision="${index}" data-doc-revision-field="date" value="${escapeAttr(row.date)}"></label>
+                  <label class="field is-wide">Descrição<input data-doc-revision="${index}" data-doc-revision-field="description" value="${escapeAttr(row.description)}"></label>
+                  <button class="button danger" type="button" data-doc-action="remove-revision" data-revision-index="${index}">Remover revisão</button>
+                </div>`).join("")}
+            </div>
+            <div class="document-automation-actions" style="margin-top:14px"><button class="button" type="button" data-doc-action="add-revision">Adicionar revisão</button></div>
+          </section>`;
+      }
+
+      function renderManualField(name, label, value, wide = false) {
+        return `<label class="field ${wide ? "is-wide" : ""}">${escapeHtml(label)}${wide ? `<textarea data-doc-manual="${escapeAttr(name)}" rows="4">${escapeHtml(value || "")}</textarea>` : `<input data-doc-manual="${escapeAttr(name)}" value="${escapeAttr(value || "")}">`}</label>`;
+      }
+
+      function renderDocumentAutomationPreviewStep(project) {
+        const preview = buildLtcatWordHtml(project, { preview: true });
+        project.generated.htmlPreview = preview;
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Prévia do LTCAT</h2><small>Confira capa, dados, histórico e riscos antes de baixar.</small></div></div>
+            ${renderDocumentAutomationValidation(project)}
+            <div class="document-automation-actions" style="margin-bottom:14px">
+              <button class="button" type="button" data-doc-step="review">Voltar para revisão</button>
+              <button class="button" type="button" data-doc-action="save-project">Salvar projeto</button>
+              <button class="button" type="button" data-doc-action="download-json">Baixar dados extraídos JSON</button>
+              <button class="button primary" type="button" data-doc-action="generate-word">Gerar Word</button>
+            </div>
+            <div class="document-automation-preview">${preview}</div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationGenerateStep(project) {
+        return `
+          <section class="document-automation-panel">
+            <div class="management-panel-head"><div><h2>Gerar Word</h2><small>O arquivo será gerado como .doc compatível com Microsoft Word, editável e sem RTF.</small></div></div>
+            ${renderDocumentAutomationValidation(project)}
+            <div class="document-automation-actions">
+              <button class="button" type="button" data-doc-action="download-json">Baixar JSON extraído</button>
+              <button class="button" type="button" data-doc-action="save-project">Salvar projeto</button>
+              <button class="button" type="button" data-doc-action="clear-project">Limpar projeto</button>
+              <button class="button primary" type="button" data-doc-action="generate-word">Gerar Word</button>
+            </div>
+          </section>`;
+      }
+
+      function renderDocumentAutomationValidation(project) {
+        updateDocumentAutomationValidation(project);
+        const missing = project.validation?.missingFields || [];
+        const warnings = project.validation?.warnings || [];
+        if (!missing.length && !warnings.length) return "";
+        return `<div class="document-automation-validation"><strong>Validação</strong><div class="document-automation-validation-list">${missing.map(item => `<span>${escapeHtml(item)}</span>`).join("")}${warnings.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div></div>`;
+      }
+
+      function bindDocumentAutomationEvents() {
+        const root = els.documentAutomationRoot;
+        if (!root) return;
+        root.onclick = handleDocumentAutomationClick;
+        root.onchange = handleDocumentAutomationChange;
+        root.oninput = handleDocumentAutomationInput;
+      }
+
+      async function handleDocumentAutomationClick(event) {
+        const stepButton = event.target.closest("[data-doc-step]");
+        if (stepButton) {
+          activeDocumentAutomationStep = stepButton.dataset.docStep || "type";
+          renderDocumentAutomation();
+          return;
+        }
+        const button = event.target.closest("[data-doc-action]");
+        if (!button) return;
+        const action = button.dataset.docAction;
+        const project = getActiveDocumentAutomationProject();
+        if (action === "back-apps") return showAppSelector();
+        if (action === "locked-type") return showToast("PGR e PCMSO entram em fases futuras.", "info");
+        if (action === "select-type") {
+          project.type = button.dataset.docType || "ltcat";
+          activeDocumentAutomationStep = "upload";
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "new-project") {
+          documentAutomationDraft = createDocumentAutomationProject();
+          activeDocumentAutomationProjectId = documentAutomationDraft.id;
+          activeDocumentAutomationStep = "type";
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "open-project") {
+          const saved = getDocumentAutomation().projects.find(item => item.id === button.dataset.projectId);
+          if (!saved) return showToast("Projeto não encontrado.", "warning");
+          activeDocumentAutomationProjectId = saved.id;
+          documentAutomationDraft = JSON.parse(JSON.stringify(saved));
+          activeDocumentAutomationStep = "review";
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "duplicate-project") return duplicateDocumentAutomationProject(button.dataset.projectId);
+        if (action === "delete-project") return deleteDocumentAutomationProject(button.dataset.projectId);
+        if (action === "remove-file") {
+          const key = button.dataset.docFileKey;
+          if (key && project.sourceFiles) project.sourceFiles[key] = null;
+          touchDocumentAutomationProject(project);
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "extract-soc") return extractCurrentDocumentAutomationProject();
+        if (action === "extract-risk-blocks") return extractLtcatRawRisksForCurrentProject();
+        if (action === "save-risk-review") {
+          recordActivity("Editou campos extraídos", "Salvou revisão manual dos riscos brutos do LTCAT.");
+          return saveDocumentAutomationProject(project);
+        }
+        if (action === "move-risk-block-up" || action === "move-risk-block-down") {
+          const index = Number(button.dataset.riskIndex);
+          const blocks = project.extractedData.riskSectorBlocks || [];
+          const target = action === "move-risk-block-up" ? index - 1 : index + 1;
+          if (blocks[index] && blocks[target]) {
+            [blocks[index], blocks[target]] = [blocks[target], blocks[index]];
+            blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
+            touchDocumentAutomationProject(project);
+            renderDocumentAutomation();
+          }
+          return;
+        }
+        if (action === "duplicate-risk-block") {
+          const index = Number(button.dataset.riskIndex);
+          const blocks = project.extractedData.riskSectorBlocks || [];
+          if (blocks[index]) {
+            blocks.splice(index + 1, 0, normalizeLtcatRawRiskSectorBlock({
+              ...blocks[index],
+              id: createId(),
+              title: `${blocks[index].title || `Setor ${index + 1}`} - cópia`,
+              order: index + 2,
+              extractedAt: new Date().toISOString()
+            }, index + 1));
+            blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
+            touchDocumentAutomationProject(project);
+            renderDocumentAutomation();
+          }
+          return;
+        }
+        if (action === "delete-risk-block") {
+          const index = Number(button.dataset.riskIndex);
+          const blocks = project.extractedData.riskSectorBlocks || [];
+          if (!blocks[index]) return;
+          if (!await openConfirmModal({ title: "Excluir setor extraído", message: `O bloco "${blocks[index].title || `Setor ${index + 1}`}" será removido da revisão de riscos.`, confirmLabel: "Excluir bloco", tone: "danger" })) return;
+          blocks.splice(index, 1);
+          blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
+          touchDocumentAutomationProject(project);
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "save-project") return saveDocumentAutomationProject(project);
+        if (action === "download-json") return downloadDocumentAutomationJson(project);
+        if (action === "generate-word") return generateLtcatDocument(project);
+        if (action === "clear-project") {
+          if (!await openConfirmModal({ title: "Limpar projeto", message: "Os dados não salvos deste projeto serão descartados.", confirmLabel: "Limpar projeto", tone: "warning" })) return;
+          documentAutomationDraft = createDocumentAutomationProject();
+          activeDocumentAutomationProjectId = documentAutomationDraft.id;
+          activeDocumentAutomationStep = "type";
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "add-revision") {
+          project.manualFields.revisionHistory.push({ revision: "", date: "", description: "" });
+          touchDocumentAutomationProject(project);
+          renderDocumentAutomation();
+          return;
+        }
+        if (action === "remove-revision") {
+          const index = Number(button.dataset.revisionIndex);
+          if (Number.isInteger(index)) project.manualFields.revisionHistory.splice(index, 1);
+          if (!project.manualFields.revisionHistory.length) project.manualFields.revisionHistory.push({ revision: "00", date: "", description: "Emissão inicial do LTCAT." });
+          touchDocumentAutomationProject(project);
+          renderDocumentAutomation();
+        }
+      }
+
+      async function handleDocumentAutomationChange(event) {
+        const fileInput = event.target.closest("[data-doc-file]");
+        if (fileInput) {
+          await handleDocumentAutomationFile(fileInput.dataset.docFile, fileInput.files && fileInput.files[0]);
+          fileInput.value = "";
+          return;
+        }
+        handleDocumentAutomationInput(event);
+      }
+
+      function handleDocumentAutomationInput(event) {
+        const project = getActiveDocumentAutomationProject();
+        const extracted = event.target.closest("[data-doc-extracted]");
+        if (extracted) {
+          project.extractedData[extracted.dataset.docExtracted] = extracted.value;
+          if (["companyName", "unitName"].includes(extracted.dataset.docExtracted)) {
+            project[extracted.dataset.docExtracted] = extracted.value;
+          }
+          touchDocumentAutomationProject(project, false);
+          return;
+        }
+        const manual = event.target.closest("[data-doc-manual]");
+        if (manual) {
+          project.manualFields[manual.dataset.docManual] = manual.value;
+          touchDocumentAutomationProject(project, false);
+          return;
+        }
+        const arrayField = event.target.closest("[data-doc-array]");
+        if (arrayField) {
+          const values = String(arrayField.value || "").split(/\n+/).map(item => item.trim()).filter(Boolean);
+          if (arrayField.dataset.docArray === "hierarchy.sectors") project.extractedData.hierarchy.sectors = values;
+          if (arrayField.dataset.docArray === "hierarchy.roles") project.extractedData.hierarchy.roles = values;
+          touchDocumentAutomationProject(project, false);
+          return;
+        }
+        const riskField = event.target.closest("[data-doc-risk]");
+        if (riskField) {
+          const index = Number(riskField.dataset.docRisk);
+          const field = riskField.dataset.docRiskField;
+          if (project.extractedData.risks[index] && field) project.extractedData.risks[index][field] = riskField.value;
+          touchDocumentAutomationProject(project, false);
+          return;
+        }
+        const rawRiskField = event.target.closest("[data-doc-raw-risk]");
+        if (rawRiskField) {
+          const index = Number(rawRiskField.dataset.docRawRisk);
+          const block = project.extractedData.riskSectorBlocks[index];
+          if (block) {
+            block.rawText = rawRiskField.value;
+            block.title = extractLtcatSectorTitleFromBlock(block.rawText, index) || block.title;
+            touchDocumentAutomationProject(project, false);
+          }
+          return;
+        }
+        const revisionField = event.target.closest("[data-doc-revision]");
+        if (revisionField) {
+          const index = Number(revisionField.dataset.docRevision);
+          const field = revisionField.dataset.docRevisionField;
+          if (project.manualFields.revisionHistory[index] && field) project.manualFields.revisionHistory[index][field] = revisionField.value;
+          touchDocumentAutomationProject(project, false);
+        }
+      }
+
+      async function handleDocumentAutomationFile(key, file) {
+        if (!file) return;
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        if (file.size > DOCUMENT_AUTOMATION_MAX_FILE_BYTES) {
+          return showToast("Arquivo muito grande. Envie arquivos com até 10 MB.", "warning");
+        }
+        const project = getActiveDocumentAutomationProject();
+        try {
+          const stored = await readDocumentAutomationFile(file, key);
+          project.sourceFiles[key] = stored;
+          if (key === "socFile") recordActivity("Enviou arquivo SOC", file.name);
+          touchDocumentAutomationProject(project);
+          if (key === "socFile" && !stored.text) {
+            showToast("Arquivo salvo como referência. Para extração automática nesta fase, envie o RTF ou TXT do SOC.", "warning", 5200);
+          } else {
+            showToast("Arquivo carregado com sucesso.", "success");
+          }
+          renderDocumentAutomation();
+        } catch (error) {
+          console.error(error);
+          showToast("Não foi possível ler o arquivo selecionado.", "danger");
+        }
+      }
+
+      function readDocumentAutomationFile(file, key) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = reject;
+          reader.onload = () => {
+            const base = {
+              id: createId(),
+              name: file.name,
+              type: file.type || inferFileMime(file.name),
+              size: file.size,
+              uploadedAt: new Date().toISOString(),
+              uploadedBy: currentUser?.email || ""
+            };
+            const shouldReadAsText = key === "socFile" && /\.(rtf|txt)$/i.test(file.name);
+            if (shouldReadAsText) {
+              base.text = String(reader.result || "");
+              resolve(base);
+            } else {
+              base.dataUrl = String(reader.result || "");
+              resolve(base);
+            }
+          };
+          if (key === "socFile" && /\.rtf$/i.test(file.name)) reader.readAsText(file, "windows-1252");
+          else if (key === "socFile" && /\.txt$/i.test(file.name)) reader.readAsText(file, "utf-8");
+          else reader.readAsDataURL(file);
+        });
+      }
+
+      function inferFileMime(name = "") {
+        if (/\.pdf$/i.test(name)) return "application/pdf";
+        if (/\.docx$/i.test(name)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (/\.doc$/i.test(name)) return "application/msword";
+        if (/\.png$/i.test(name)) return "image/png";
+        if (/\.jpe?g$/i.test(name)) return "image/jpeg";
+        if (/\.rtf$/i.test(name)) return "application/rtf";
+        return "application/octet-stream";
+      }
+
+      function touchDocumentAutomationProject(project, regenerateValidation = true) {
+        project.updatedAt = new Date().toISOString();
+        project.updatedBy = currentUser?.email || "";
+        if (regenerateValidation) updateDocumentAutomationValidation(project);
+      }
+
+      function parseSocRtfToText(fileText = "") {
+        let text = String(fileText || "");
+        if (!/[{}\\][a-z0-9*'-]+/i.test(text)) return normalizeSocText(text);
+        text = stripRtfBinaryPayloads(text);
+        text = removeRtfDestinationGroups(text);
+        text = text.replace(/\\'[0-9a-fA-F]{2}/g, match => {
+          const byte = parseInt(match.slice(2), 16);
+          try {
+            return new TextDecoder("windows-1252").decode(new Uint8Array([byte]));
+          } catch (error) {
+            return String.fromCharCode(byte);
+          }
+        });
+        text = text
+          .replace(/\\u(-?\d+)(?: ?(?![\\{}]).)?/g, (_, code) => {
+            const value = Number(code);
+            return Number.isFinite(value) ? String.fromCharCode(value < 0 ? value + 65536 : value) : "";
+          })
+          .replace(/\\pard\b/g, "")
+          .replace(/\\par\b/g, "\n")
+          .replace(/\\line/g, "\n")
+          .replace(/\\tab/g, "    ")
+          .replace(/\\cell/g, "\t")
+          .replace(/\\row/g, "\n")
+          .replace(/\\page/g, "\n\n")
+          .replace(/\\~|~/g, " ")
+          .replace(/\\[-_{}]/g, "")
+          .replace(/\\[a-zA-Z*]+-?\d* ?/g, "")
+          .replace(/[{}]/g, "");
+        return normalizeSocText(text);
+      }
+
+      function stripRtfBinaryPayloads(value = "") {
+        const text = String(value || "");
+        let output = "";
+        let index = 0;
+        while (index < text.length) {
+          const rest = text.slice(index);
+          const match = rest.match(/^\\bin(-?\d+) ?/i);
+          if (match) {
+            const count = Math.max(0, Number(match[1]) || 0);
+            index += match[0].length + count;
+            output += " ";
+            continue;
+          }
+          output += text[index];
+          index += 1;
+        }
+        return output;
+      }
+
+      function removeRtfDestinationGroups(value = "") {
+        const text = String(value || "");
+        const destinations = new Set(["fonttbl", "colortbl", "stylesheet", "info", "pict", "object", "shp", "shpinst", "shppict", "themedata", "datastore", "xmlnstbl", "generator"]);
+        let output = "";
+        let skipDepth = 0;
+        for (let index = 0; index < text.length; index += 1) {
+          const char = text[index];
+          if (char === "{") {
+            if (skipDepth > 0) {
+              skipDepth += 1;
+              continue;
+            }
+            const destination = readRtfGroupDestination(text, index + 1);
+            if (destination && destinations.has(destination)) {
+              skipDepth = 1;
+              continue;
+            }
+          }
+          if (char === "}" && skipDepth > 0) {
+            skipDepth -= 1;
+            continue;
+          }
+          if (skipDepth === 0) output += char;
+        }
+        return output;
+      }
+
+      function readRtfGroupDestination(text, startIndex) {
+        let index = startIndex;
+        while (/\s/.test(text[index] || "")) index += 1;
+        if (text[index] !== "\\") return "";
+        index += 1;
+        if (text[index] === "*") {
+          index += 1;
+          if (text[index] === "\\") index += 1;
+        }
+        const match = text.slice(index).match(/^([a-zA-Z]+)/);
+        return match ? match[1].toLowerCase() : "";
+      }
+
+      function normalizeSocText(text = "") {
+        return String(text || "")
+          .replace(/\r/g, "\n")
+          .replace(/\u0000/g, "")
+          .replace(/\bx\d{4,}(?=[A-Za-zÀ-ÿ])/g, "")
+          .replace(/\bx\d{4,}\b/g, "")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n[ \t]+/g, "\n")
+          .replace(/[ \t]{2,}/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function normalizeSocTextForRiskExtraction(text = "") {
+        return String(text || "")
+          .replace(/\r\n?/g, "\n")
+          .replace(/\u00a0/g, " ")
+          .replace(/\u0000/g, "")
+          .replace(/\bx\d{4,}(?=[A-Za-zÀ-ÿ])/g, "")
+          .replace(/\bx\d{4,}\b/g, "")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n[ \t]+/g, "\n")
+          .replace(/[ \t]{2,}/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function normalizeSocPlainText(text = "") {
+        return normalizeSocTextForRiskExtraction(text);
+      }
+
+      function extractLtcatRawRiskBlocksFromSocText(text = "") {
+        const core = extractLtcatSocRiskCore(text);
+        return {
+          error: core.success ? "" : core.error,
+          warnings: core.warnings || [],
+          rawRiskSection: core.rawRiskCore || "",
+          synthesisRawText: core.synthesisRawText || "",
+          riskSectorBlocks: core.sectors || [],
+          companyData: core.companyData || {},
+          debug: core.debug || {}
+        };
+      }
+
+      function extractLtcatSocRiskCore(text = "") {
+        const normalized = normalizeSocPlainText(text);
+        const lines = normalized.split("\n");
+        const warnings = [];
+        const unidadeIndex = findLineIndex(lines, line => /\bunidade\b/i.test(normalizeText(line)));
+        const headerIndex = findLineIndex(lines, (_line, index) => isHierarchyHeaderSectorLine(lines, index), unidadeIndex >= 0 ? unidadeIndex + 1 : 0);
+        const startIndex = findFirstRealSetorAfter(lines, unidadeIndex >= 0 ? unidadeIndex + 1 : 0);
+        if (startIndex < 0) {
+          return {
+            success: false,
+            error: headerIndex >= 0
+              ? "Foi encontrada a tabela de hierarquia, mas nenhum SETOR real de riscos foi localizado depois dela."
+              : "Não foi possível encontrar o primeiro SETOR real após UNIDADE. Verifique se o RTF do SOC está correto.",
+            companyData: extractLtcatCompanyDataFromSocText(normalized),
+            rawRiskCore: "",
+            sectors: [],
+            debug: { unidadeIndex, startIndex: -1, sinteseIndex: -1, sectorCount: 0, ignoredHierarchyHeader: headerIndex >= 0 },
+            warnings
+          };
+        }
+
+        let sinteseIndex = findLineIndexAfter(lines, startIndex + 1, line => /^\s*sintese\b/i.test(normalizeText(line)));
+        let endIndex = sinteseIndex;
+        let synthesisRawText = "";
+        if (sinteseIndex > startIndex) {
+          synthesisRawText = lines.slice(sinteseIndex).join("\n").trim();
+        } else {
+          endIndex = findLineIndexAfter(lines, startIndex + 1, line => /^(conclusao|assinatura|anexos|termo)\b/i.test(normalizeText(line).trim()));
+          warnings.push("Síntese não encontrada. O sistema extraiu o bloco até o fim do documento. Revise antes de gerar.");
+          if (endIndex < 0) endIndex = lines.length;
+          sinteseIndex = -1;
+        }
+
+        const rawRiskCoreLines = lines.slice(startIndex, endIndex);
+        const sectors = splitRawRiskCoreByRealSetor(rawRiskCoreLines);
+        const debug = {
+          unidadeIndex,
+          headerIndex,
+          startIndex,
+          sinteseIndex,
+          endIndex,
+          sectorCount: sectors.length,
+          sectorNames: sectors.map(sector => sector.title).filter(Boolean),
+          ignoredHierarchyHeader: headerIndex >= 0 && headerIndex < startIndex,
+          first300Chars: rawRiskCoreLines.join("\n").trim().slice(0, 300),
+          last300Chars: rawRiskCoreLines.join("\n").trim().slice(-300)
+        };
+        return {
+          success: sectors.length > 0,
+          error: sectors.length ? "" : "Nenhum bloco iniciado por SETOR foi encontrado após UNIDADE.",
+          companyData: extractLtcatCompanyDataFromSocText(normalized),
+          rawRiskCore: rawRiskCoreLines.join("\n").trim(),
+          sectors,
+          synthesisRawText,
+          debug,
+          warnings
+        };
+      }
+
+      function findLineIndex(lines, predicate, startIndex = 0) {
+        for (let index = Math.max(0, startIndex || 0); index < lines.length; index += 1) {
+          if (predicate(lines[index], index)) return index;
+        }
+        return -1;
+      }
+
+      function findLineIndexAfter(lines, startIndex, predicate) {
+        return findLineIndex(lines, predicate, startIndex);
+      }
+
+      function findFirstRealSetorAfter(lines, startIndex = 0) {
+        return findLineIndex(lines, (_line, index) => isRealRiskSectorStart(lines, index), startIndex);
+      }
+
+      function isRealRiskSectorStart(lines, index) {
+        const line = String(lines[index] || "").trim();
+        const match = line.match(/^\s*SETOR\b\s*:?\s*(.*)$/i);
+        if (!match) return false;
+        if (isHierarchyHeaderSectorLine(lines, index)) return false;
+        const inlineTitle = String(match[1] || "").trim();
+        if (inlineTitle) {
+          const normalizedInline = normalizeText(inlineTitle).trim();
+          if (/cargo|funcionario|funcionarios|funcao|função|quantidade/.test(normalizedInline)) return false;
+          if (hasRecentStandaloneSetor(lines, index)) return false;
+          return true;
+        }
+        const next = getNextNonEmptyLines(lines, index, 4);
+        if (!next.length) return false;
+        const first = normalizeText(next[0]).trim();
+        if (/^(cargo|funcionario|funcionarios|funcao|função|quantidade)$/.test(first)) return false;
+        return true;
+      }
+
+      function isHierarchyHeaderSectorLine(lines, index) {
+        const line = normalizeText(String(lines[index] || "").replace(/\s+/g, " ").trim());
+        if (/^setor\s+cargo\s+funcionarios?$/.test(line)) return true;
+        if (line !== "setor") return false;
+        const next = getNextNonEmptyLines(lines, index, 4).map(value => normalizeText(value).trim());
+        return next[0] === "cargo" && /^funcionarios?$/.test(next[1] || "");
+      }
+
+      function hasRecentStandaloneSetor(lines, index) {
+        let checked = 0;
+        for (let cursor = index - 1; cursor >= 0 && checked < 4; cursor -= 1) {
+          const value = String(lines[cursor] || "").trim();
+          if (!value) continue;
+          checked += 1;
+          if (/^\s*SETOR\b\s*:?\s*$/i.test(value)) return true;
+          if (/^\s*CARGO\b/i.test(value)) return false;
+        }
+        return false;
+      }
+
+      function getNextNonEmptyLines(lines, index, limit = 4) {
+        const values = [];
+        for (let cursor = index + 1; cursor < lines.length && values.length < limit; cursor += 1) {
+          const value = String(lines[cursor] || "").trim();
+          if (value) values.push(value);
+        }
+        return values;
+      }
+
+      function splitRawRiskCoreByRealSetor(lines) {
+        const sourceLines = Array.isArray(lines) ? lines : String(lines || "").split("\n");
+        const starts = [];
+        for (let index = 0; index < sourceLines.length; index += 1) {
+          if (isRealRiskSectorStart(sourceLines, index)) starts.push(index);
+        }
+        const now = new Date().toISOString();
+        return starts.map((start, sectorIndex) => {
+          const end = starts[sectorIndex + 1] == null ? sourceLines.length : starts[sectorIndex + 1];
+          const rawText = sourceLines.slice(start, end).join("\n").trim();
+          return normalizeLtcatRawRiskSectorBlock({
+            id: createId(),
+            title: extractLtcatSectorTitleFromBlock(rawText, sectorIndex),
+            rawText,
+            order: sectorIndex + 1,
+            extractedAt: now
+          }, sectorIndex);
+        });
+      }
+
+      function extractLtcatSectorTitleFromBlock(rawText = "", index = 0) {
+        const lines = String(rawText || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
+        const first = lines[0] || "";
+        const inlineTitle = first.replace(/^setor\s*:?\s*/i, "").trim();
+        if (inlineTitle && normalizeText(inlineTitle) !== "setor") return inlineTitle;
+        const title = (lines[1] || "").trim();
+        if (title && !/^(cargo|funcao|função|gfip|descricao|descrição)\b/i.test(normalizeText(title))) return title;
+        return `Setor ${index + 1}`;
+      }
+
+      function extractLtcatCompanyDataFromSocText(text = "") {
+        const clean = normalizeSocText(text);
+        const lines = clean.split("\n");
+        const cnpjMatch = clean.match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/);
+        const cepMatch = clean.match(/\b\d{5}-?\d{3}\b/);
+        const address = extractAddress(clean);
+        const unitName = extractUnitName(clean);
+        const companyName = extractCompanyName(clean) || unitName;
+        const cityState = extractCityStateFromAddress(address);
+        return {
+          companyName,
+          unitName,
+          cnpj: cnpjMatch ? cnpjMatch[0] : "",
+          address,
+          cep: cepMatch ? cepMatch[0] : "",
+          city: cityState.city,
+          state: cityState.state,
+          cnae: extractCnae(clean),
+          riskDegree: extractRiskGrade(clean),
+          issueDate: findDateNear(clean, ["Emitido em", "Data de emissão", "Emissão", "Data do documento"]),
+          technicalResponsible: findSocValue(clean, ["Responsável Técnico", "Responsável pela elaboração", "Elaborado por"]),
+          hierarchy: extractLtcatHierarchy(lines)
+        };
+      }
+
+      function extractCompanyName(text = "") {
+        const lines = normalizeSocText(text).split("\n").map(line => line.trim()).filter(Boolean);
+        const cnpjIndex = lines.findIndex(line => /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/.test(line));
+        if (cnpjIndex > 0) {
+          for (let index = cnpjIndex - 1; index >= Math.max(0, cnpjIndex - 8); index -= 1) {
+            const candidate = lines[index];
+            if (candidate && !/^(cnpj|endere[cç]o|unidade|ltcat|laudo|emitido|-|\.)$/i.test(candidate)) return candidate;
+          }
+        }
+        return extractByLabel(text, "Empresa") || extractByLabel(text, "Razão Social") || "";
+      }
+
+      function extractUnitName(text = "") {
+        const lines = normalizeSocText(text).split("\n");
+        const unidadeIndex = findLineIndex(lines, line => /\bunidade\b/i.test(normalizeText(line)));
+        if (unidadeIndex >= 0) {
+          const next = getNextNonEmptyLines(lines, unidadeIndex, 8).find(value => !/^(cnpj|endere[cç]o|cnae|grau de risco|-|\.)$/i.test(value.trim()));
+          if (next) return next.trim();
+        }
+        return extractByLabel(text, "Unidade") || extractByLabel(text, "Estabelecimento") || "";
+      }
+
+      function extractCnpj(text = "") {
+        return (String(text || "").match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/) || [""])[0];
+      }
+
+      function extractCnae(text = "") {
+        const clean = normalizeSocText(text);
+        const direct = clean.match(/\b\d{4}-\d\/\d{2}\s*-\s*[^\n]{2,180}/);
+        if (direct) return direct[0].trim();
+        const compact = clean.match(/\b\d{4}-\d\/\d{2}\b/);
+        if (compact) return compact[0].trim();
+        return extractValueAfterStandaloneLabel(clean, "CNAE") || extractByLabel(clean, "CNAE") || "";
+      }
+
+      function extractAddress(text = "") {
+        return extractValueAfterStandaloneLabel(text, "Endereço") || extractValueAfterStandaloneLabel(text, "Endereco") || extractByLabel(text, "Endereço") || extractByLabel(text, "Logradouro") || "";
+      }
+
+      function extractRiskGrade(text = "") {
+        const direct = String(text || "").match(/Grau\s+de\s+Risco\s*:?\s*([0-4]\b|[^\n]{1,40})/i);
+        if (direct) return direct[0].replace(/^Grau\s+de\s+Risco\s*:?\s*/i, "Grau de Risco ").trim();
+        return findSocValue(text, ["Grau de Risco", "Grau risco"]);
+      }
+
+      function extractValueAfterStandaloneLabel(text = "", label = "") {
+        const lines = normalizeSocText(text).split("\n").map(line => line.trim());
+        const target = normalizeText(label).trim();
+        for (let index = 0; index < lines.length; index += 1) {
+          const current = lines[index];
+          const normalized = normalizeText(current).replace(/:$/, "").trim();
+          if (normalized === target) {
+            const next = getNextNonEmptyLines(lines, index, 8).find(value => !/^[-.]$/.test(value.trim()));
+            if (next) return next.trim();
+          }
+          if (normalized.startsWith(`${target}:`)) {
+            const value = current.replace(new RegExp(`^${label}\\s*:?\\s*`, "i"), "").trim();
+            if (value) return value;
+          }
+        }
+        return "";
+      }
+
+      function extractCityStateFromAddress(address = "") {
+        const text = String(address || "");
+        const slash = text.match(/([A-Za-zÀ-ÿ\s.'-]+)\/([A-Z]{2})\b/);
+        if (slash) return { city: slash[1].split("-").pop().trim(), state: slash[2].toUpperCase() };
+        return { city: "", state: "" };
+      }
+
+      function extractLtcatHierarchy(lines = []) {
+        const sectors = [];
+        const roles = [];
+        const headerIndex = findLineIndex(lines, (_line, index) => isHierarchyHeaderSectorLine(lines, index));
+        const firstRealSetor = findFirstRealSetorAfter(lines, headerIndex >= 0 ? headerIndex + 1 : 0);
+        if (headerIndex >= 0) {
+          const end = firstRealSetor > headerIndex ? firstRealSetor : Math.min(lines.length, headerIndex + 120);
+          for (let index = headerIndex + 3; index < end; index += 2) {
+            const sector = String(lines[index] || "").trim();
+            const role = String(lines[index + 1] || "").trim();
+            if (sector && !/^[-.]$/.test(sector)) sectors.push(sector);
+            if (role && !/^[-.]$/.test(role) && !/^\d+$/.test(role)) roles.push(role);
+          }
+        }
+        const riskCoreStart = firstRealSetor >= 0 ? firstRealSetor : 0;
+        for (let index = riskCoreStart; index < lines.length; index += 1) {
+          if (/^\s*CARGO\b\s*:?\s*$/i.test(lines[index] || "")) {
+            const title = getNextNonEmptyLines(lines, index, 4)[0] || "";
+            if (title) roles.push(title);
+          }
+        }
+        return {
+          sectors: uniqueStrings(sectors),
+          roles: uniqueStrings(roles)
+        };
+      }
+
+      function extractLtcatCargoNamesFromRiskCore(rawRiskCore = "") {
+        const lines = String(rawRiskCore || "").split("\n");
+        const roles = [];
+        for (let index = 0; index < lines.length; index += 1) {
+          if (/^\s*CARGO\b\s*:?\s*$/i.test(lines[index] || "")) {
+            const title = getNextNonEmptyLines(lines, index, 4)[0] || "";
+            if (title && !/^(gfip|descri[cç][aã]o|especifica[cç][aã]o|-|\.)$/i.test(title.trim())) roles.push(title.trim());
+          }
+        }
+        return uniqueStrings(roles);
+      }
+
+      function extractCurrentDocumentAutomationProject() {
+        const project = getActiveDocumentAutomationProject();
+        const file = project.sourceFiles?.socFile;
+        if (!file || !file.text) {
+          activeDocumentAutomationStep = "upload";
+          renderDocumentAutomation();
+          return showToast("Envie o documento bruto do SOC antes de extrair.", "warning");
+        }
+        const text = parseSocRtfToText(file.text);
+        const extracted = extractLtcatDataFromSocText(text);
+        const currentBlocks = project.extractedData?.riskSectorBlocks || [];
+        if (currentBlocks.length) {
+          extracted.rawRiskSection = project.extractedData.rawRiskSection || "";
+          extracted.riskSectorBlocks = currentBlocks;
+          extracted.synthesisRawText = project.extractedData.synthesisRawText || "";
+          extracted.riskExtractionWarnings = project.extractedData.riskExtractionWarnings || [];
+          extracted.extractionDebug = project.extractedData.extractionDebug || {};
+          extracted.rawRiskWarning = "Os blocos de riscos editados manualmente foram preservados. Use Extrair riscos novamente para substituir.";
+        } else {
+          const rawRiskResult = extractLtcatSocRiskCore(text);
+          Object.assign(extracted, rawRiskResult.companyData || {});
+          extracted.rawRiskSection = rawRiskResult.rawRiskCore || "";
+          extracted.riskSectorBlocks = rawRiskResult.sectors || [];
+          extracted.synthesisRawText = "";
+          extracted.rawRiskWarning = rawRiskResult.error || rawRiskResult.warnings.join(" ");
+          extracted.riskExtractionWarnings = rawRiskResult.warnings || [];
+          extracted.extractionDebug = rawRiskResult.debug || {};
+          extracted.hierarchy = {
+            sectors: rawRiskResult.sectors.map(block => block.title).filter(Boolean),
+            roles: extractLtcatCargoNamesFromRiskCore(rawRiskResult.rawRiskCore || "")
+          };
+        }
+        project.extractedData = extracted;
+        project.companyName = extracted.companyName || project.companyName;
+        project.unitName = extracted.unitName || project.unitName;
+        project.title = buildDocumentAutomationTitle(project);
+        project.status = "review";
+        touchDocumentAutomationProject(project);
+        recordActivity("Extraiu dados do SOC", `Extração processada para ${project.companyName || file.name}.`);
+        activeDocumentAutomationStep = "review";
+        showToast("Dados extraídos. Revise antes de gerar o Word.", "success");
+        renderDocumentAutomation();
+      }
+
+      async function extractLtcatRawRisksForCurrentProject() {
+        const project = getActiveDocumentAutomationProject();
+        const file = project.sourceFiles?.socFile;
+        if (!file || !file.text) {
+          activeDocumentAutomationStep = "upload";
+          renderDocumentAutomation();
+          return showToast("Envie o RTF ou TXT do SOC antes de extrair os riscos.", "warning");
+        }
+        const currentBlocks = project.extractedData?.riskSectorBlocks || [];
+        if (currentBlocks.length) {
+          const confirmed = await openConfirmModal({
+            title: "Extrair riscos novamente",
+            message: "Isso substituirá os blocos de riscos editados manualmente. Deseja continuar?",
+            confirmLabel: "Extrair novamente",
+            tone: "warning",
+            requiredText: "EXTRAIR"
+          });
+          if (!confirmed) return;
+        }
+        const text = parseSocRtfToText(file.text);
+        const result = extractLtcatSocRiskCore(text);
+        const companyData = result.companyData || {};
+        Object.assign(project.extractedData, Object.fromEntries(Object.entries(companyData).filter(([, value]) => value)));
+        project.extractedData.rawSocText = text;
+        project.extractedData.rawText = text;
+        project.extractedData.rawRiskSection = result.rawRiskCore || "";
+        project.extractedData.riskSectorBlocks = result.sectors || [];
+        project.extractedData.synthesisRawText = "";
+        project.extractedData.riskExtractionWarnings = result.warnings || [];
+        project.extractedData.extractionDebug = result.debug || {};
+        project.extractedData.rawRiskWarning = result.error || result.warnings.join(" ");
+        if (result.sectors.length) {
+          project.extractedData.hierarchy.sectors = result.sectors.map(block => block.title).filter(Boolean);
+          project.extractedData.hierarchy.roles = extractLtcatCargoNamesFromRiskCore(result.rawRiskCore || "");
+        }
+        touchDocumentAutomationProject(project);
+        activeDocumentAutomationStep = "review";
+        if (result.error) showToast(result.error, "warning", 5200);
+        else showToast(`${result.sectors.length} setor(es) extraído(s) do SOC.`, result.warnings.length ? "warning" : "success", 5200);
+        renderDocumentAutomation();
+      }
+
+      function extractLtcatDataFromSocText(text = "") {
+        const clean = normalizeSocText(text);
+        const data = normalizeLtcatExtractedData({ rawText: clean, rawSocText: clean });
+        const companyData = extractLtcatCompanyDataFromSocText(clean);
+        Object.assign(data, companyData);
+        const cityState = findSocValue(clean, ["Cidade/UF", "Município/UF", "Cidade"]);
+        if (cityState) {
+          const parts = cityState.split(/[-/]/).map(part => part.trim()).filter(Boolean);
+          data.city = parts[0] || "";
+          data.state = (parts[1] || "").slice(0, 2).toUpperCase();
+        }
+        data.hierarchy = companyData.hierarchy || data.hierarchy;
+        data.risks = [];
+        return data;
+      }
+
+      function extractByLabel(text, label) {
+        return findSocValue(text, [label]);
+      }
+
+      function findSocValue(text, labels) {
+        for (const label of labels) {
+          const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const match = text.match(new RegExp(`${escaped}\\s*[:\\-]?\\s*([^\\n\\t]{2,160})`, "i"));
+          if (match) return match[1].trim().replace(/\s{2,}/g, " ");
+        }
+        return "";
+      }
+
+      function findDateNear(text, labels) {
+        for (const label of labels) {
+          const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const match = text.match(new RegExp(`${escaped}[^\\n]{0,80}?(\\d{2}\\/\\d{2}\\/\\d{4}|\\d{4}-\\d{2}-\\d{2})`, "i"));
+          if (match) return match[1];
+        }
+        return (text.match(/\b\d{2}\/\d{2}\/\d{4}\b/) || [""])[0];
+      }
+
+      function extractLtcatRisksFromSocLines(lines, fullText) {
+        const risks = [];
+        let currentSetor = "";
+        let currentCargo = "";
+        lines.forEach((line, index) => {
+          const normalized = normalizeText(line);
+          if (/^setor\b/.test(normalized)) currentSetor = line.replace(/^setor\s*:?\s*/i, "");
+          if (/^(cargo|funcao)\b/.test(normalized)) currentCargo = line.replace(/^(cargo|função|funcao)\s*:?\s*/i, "");
+          const riskName = detectRiskName(line);
+          if (!riskName) return;
+          const context = lines.slice(Math.max(0, index - 4), Math.min(lines.length, index + 12)).join("\n");
+          risks.push(normalizeLtcatRisk({
+            setor: currentSetor,
+            cargo: currentCargo,
+            grupo: detectRiskGroup(riskName, context),
+            codigoESocial: (context.match(/\b\d{2}\.\d{2}\.\d{3}\b|\b\d{2,3}-\d{2}-\d\b/) || [""])[0],
+            perigo: riskName,
+            descricao: pickContextValue(context, ["Descrição", "Descricão", "Perigo/Fator de Risco"]) || context.slice(0, 500),
+            fundamentacaoLegal: pickContextValue(context, ["Fundamentação legal", "Fundamentacao legal", "Legislação"]),
+            possiveisLesoes: pickContextValue(context, ["Possíveis lesões", "Possiveis lesoes", "Agravos"]),
+            fontesCircunstancias: pickContextValue(context, ["Fontes", "Circunstâncias", "Circunstancias"]),
+            criterioAvaliacao: pickContextValue(context, ["Critério", "Criterio", "Avaliação", "Avaliacao"]),
+            perfilExposicao: pickContextValue(context, ["Perfil de exposição", "Perfil de exposicao", "Exposição", "Exposicao"]),
+            probabilidade: pickContextValue(context, ["Probabilidade"]),
+            gravidade: pickContextValue(context, ["Gravidade"]),
+            nivelRisco: pickContextValue(context, ["Nível de risco", "Nivel de risco"]),
+            prevencaoControle: pickContextValue(context, ["Prevenção", "Prevencao", "Controle", "Medidas"]),
+            parecerTecnico: pickContextValue(context, ["Parecer técnico", "Parecer tecnico"]),
+            conclusaoAposentadoria: pickContextValue(context, ["Conclusão", "Conclusao", "Aposentadoria"])
+          }));
+        });
+        return dedupeLtcatRisks(risks).slice(0, 200);
+      }
+
+      function detectRiskName(line) {
+        const candidates = [
+          "Ruído", "Calor", "Frio", "Umidade", "Vibração", "Radiação", "Poeira", "Fumos", "Névoas", "Vapores",
+          "Agentes químicos", "Agentes biológicos", "Bactérias", "Fungos", "Vírus", "Óleos", "Graxa", "Solvente",
+          "Benzeno", "Sílica", "Asbesto", "Cromo", "Manganês", "Chumbo"
+        ];
+        const normalizedLine = normalizeText(line);
+        if (!/(risco|agente|perigo|fator|ruido|calor|quimic|biologic|poeira|vibrac|radiac|umidade|frio)/.test(normalizedLine)) return "";
+        const found = candidates.find(item => normalizedLine.includes(normalizeText(item)));
+        if (found) return found;
+        const cleaned = line.replace(/^(risco|agente|perigo|fator de risco)\s*:?\s*/i, "").trim();
+        return cleaned.length >= 3 && cleaned.length <= 120 ? cleaned : "";
+      }
+
+      function detectRiskGroup(riskName, context = "") {
+        const text = normalizeText(`${riskName} ${context}`);
+        if (/ruido|calor|frio|umidade|vibrac|radiac/.test(text)) return "Físico";
+        if (/quimic|poeira|fumos|nevoa|vapor|oleo|graxa|solvente|benzeno|silica|asbesto|cromo|chumbo|manganes/.test(text)) return "Químico";
+        if (/biologic|bacteria|fungo|virus|parasita/.test(text)) return "Biológico";
+        return "Inespecífico";
+      }
+
+      function pickContextValue(context, labels) {
+        for (const label of labels) {
+          const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const match = context.match(new RegExp(`${escaped}\\s*[:\\-]?\\s*([^\\n]{2,360})`, "i"));
+          if (match) return match[1].trim();
+        }
+        return "";
+      }
+
+      function uniqueStrings(values) {
+        const seen = new Set();
+        return values.map(value => String(value || "").trim()).filter(value => {
+          const key = normalizeText(value);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function dedupeLtcatRisks(risks) {
+        const seen = new Set();
+        return risks.filter(risk => {
+          const key = normalizeText([risk.setor, risk.cargo, risk.perigo].join("|"));
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function updateDocumentAutomationValidation(project) {
+        const data = project.extractedData || {};
+        const missing = [];
+        const warnings = [];
+        const confidence = {};
+        [
+          ["companyName", "Empresa não encontrada"],
+          ["cnpj", "CNPJ não encontrado"],
+          ["cnae", "CNAE não encontrado"],
+          ["address", "Endereço não encontrado"],
+          ["city", "Cidade não encontrada"]
+        ].forEach(([field, label]) => {
+          confidence[field] = data[field] ? "high" : "missing";
+          if (!data[field]) warnings.push(`${label}. O documento será gerado mesmo assim.`);
+        });
+        if (!data.riskSectorBlocks || !data.riskSectorBlocks.length) missing.push("Nenhum bloco iniciado por SETOR foi extraído do SOC");
+        if (data.rawRiskWarning) warnings.push(data.rawRiskWarning);
+        if (!data.hierarchy?.sectors?.length) warnings.push("Nenhum setor encontrado");
+        if (!project.sourceFiles?.companyLogo) warnings.push("Logo da empresa não enviada");
+        if (!project.sourceFiles?.previousDocumentFile) warnings.push("Documento anterior não enviado");
+        if (!project.manualFields?.revisionHistory?.length) warnings.push("Histórico de revisão vazio");
+        project.validation = { missingFields: missing, warnings, confidence };
+        return project.validation;
+      }
+
+      function confidenceLabel(value) {
+        if (value === "high") return "alta";
+        if (value === "medium") return "revisar";
+        if (value === "low") return "baixa";
+        return "não encontrado";
+      }
+
+      function ltcatRiskFieldLabel(field) {
+        const labels = {
+          setor: "Setor",
+          cargo: "Cargo",
+          grupo: "Grupo",
+          codigoESocial: "Código eSocial",
+          perigo: "Perigo/Fator de Risco",
+          criterioAvaliacao: "Critério de avaliação",
+          perfilExposicao: "Perfil de exposição",
+          parecerTecnico: "Parecer técnico",
+          conclusaoAposentadoria: "Conclusão da aposentadoria especial"
+        };
+        return labels[field] || field;
+      }
+
+      function buildDocumentAutomationTitle(project) {
+        const data = project?.extractedData || {};
+        const fields = project?.manualFields || {};
+        const company = fields.finalCompanyName || project?.companyName || data.companyName || "Empresa";
+        const unit = fields.unitName || project?.unitName || data.unitName || "";
+        const parts = ["LTCAT", company];
+        if (unit && normalizeText(unit) !== normalizeText(company)) parts.push(unit);
+        return parts.filter(Boolean).join(" - ");
+      }
+
+      function saveDocumentAutomationProject(project) {
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        const state = getDocumentAutomation();
+        const normalized = normalizeDocumentAutomationProject({
+          ...project,
+          title: buildDocumentAutomationTitle(project),
+          companyName: project.companyName || project.extractedData?.companyName || "",
+          unitName: project.unitName || project.extractedData?.unitName || ""
+        });
+        touchDocumentAutomationProject(normalized);
+        const index = state.projects.findIndex(item => item.id === normalized.id);
+        const isNew = index < 0;
+        if (isNew) state.projects.unshift(normalized);
+        else state.projects[index] = normalized;
+        activeDocumentAutomationProjectId = normalized.id;
+        documentAutomationDraft = JSON.parse(JSON.stringify(normalized));
+        app.documentAutomation = normalizeDocumentAutomation(state);
+        recordActivity(isNew ? "Criou projeto de automação" : "Salvou projeto de automação", normalized.title);
+        saveApp({ fullSave: true });
+        showToast("Projeto salvo com sucesso.", "success");
+        renderDocumentAutomation();
+      }
+
+      function duplicateDocumentAutomationProject(projectId) {
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        const state = getDocumentAutomation();
+        const source = state.projects.find(project => project.id === projectId);
+        if (!source) return showToast("Projeto não encontrado.", "warning");
+        const now = new Date().toISOString();
+        const copy = normalizeDocumentAutomationProject({
+          ...JSON.parse(JSON.stringify(source)),
+          id: createId(),
+          title: `${source.title || "LTCAT"} - cópia`,
+          status: "draft",
+          createdAt: now,
+          updatedAt: now,
+          createdBy: currentUser?.email || "",
+          updatedBy: currentUser?.email || "",
+          generated: {
+            htmlPreview: "",
+            lastGeneratedAt: "",
+            fileName: ""
+          }
+        });
+        state.projects.unshift(copy);
+        activeDocumentAutomationProjectId = copy.id;
+        documentAutomationDraft = JSON.parse(JSON.stringify(copy));
+        app.documentAutomation = normalizeDocumentAutomation(state);
+        recordActivity("Criou projeto de automação", `Duplicou ${source.title || "projeto de automação"}.`);
+        saveApp({ fullSave: true });
+        showToast("Projeto duplicado.", "success");
+        renderDocumentAutomation();
+      }
+
+      async function deleteDocumentAutomationProject(projectId) {
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        const state = getDocumentAutomation();
+        const project = state.projects.find(item => item.id === projectId);
+        if (!project) return showToast("Projeto não encontrado.", "warning");
+        const confirmed = await openConfirmModal({
+          title: "Excluir projeto de automação",
+          message: `O projeto "${project.title || "LTCAT"}" será removido da lista de documentos automatizados.`,
+          confirmLabel: "Excluir projeto",
+          tone: "danger",
+          requiredText: "EXCLUIR"
+        });
+        if (!confirmed) return;
+        state.projects = state.projects.filter(item => item.id !== projectId);
+        if (activeDocumentAutomationProjectId === projectId) {
+          documentAutomationDraft = createDocumentAutomationProject();
+          activeDocumentAutomationProjectId = documentAutomationDraft.id;
+          activeDocumentAutomationStep = "type";
+        }
+        app.documentAutomation = normalizeDocumentAutomation(state);
+        recordActivity("Excluiu projeto de automação", project.title || projectId);
+        saveApp({ fullSave: true });
+        showToast("Projeto excluído.", "success");
+        renderDocumentAutomation();
+      }
+
+      function downloadDocumentAutomationJson(project) {
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        const payload = {
+          exportedAt: new Date().toISOString(),
+          app: "SATS",
+          module: "Automação de Documentos",
+          type: project.type,
+          title: project.title,
+          companyName: project.companyName,
+          unitName: project.unitName,
+          extraction: {
+            companyData: project.extractedData ? {
+              companyName: project.extractedData.companyName || "",
+              unitName: project.extractedData.unitName || "",
+              cnpj: project.extractedData.cnpj || "",
+              address: project.extractedData.address || "",
+              cep: project.extractedData.cep || "",
+              city: project.extractedData.city || "",
+              state: project.extractedData.state || "",
+              cnae: project.extractedData.cnae || "",
+              riskDegree: project.extractedData.riskDegree || ""
+            } : {},
+            rawRiskCore: project.extractedData?.rawRiskSection || "",
+            sectors: project.extractedData?.riskSectorBlocks || [],
+            debug: project.extractedData?.extractionDebug || {},
+            warnings: project.extractedData?.riskExtractionWarnings || []
+          },
+          extractedData: project.extractedData,
+          manualFields: project.manualFields,
+          validation: project.validation,
+          sourceFiles: Object.fromEntries(Object.entries(project.sourceFiles || {}).map(([key, file]) => [
+            key,
+            file ? {
+              id: file.id,
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              uploadedAt: file.uploadedAt,
+              uploadedBy: file.uploadedBy
+            } : null
+          ]))
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+        downloadBlob(blob, `${sanitizeFileName(project.title || "ltcat-dados-extraidos") || "ltcat-dados-extraidos"}.json`);
+        showToast("JSON extraído baixado.", "success");
+      }
+
+      function generateLtcatDocument(project) {
+        if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
+        const normalized = normalizeDocumentAutomationProject(project);
+        updateDocumentAutomationValidation(normalized);
+        if (!normalized.extractedData?.riskSectorBlocks?.length) {
+          documentAutomationDraft = normalized;
+          activeDocumentAutomationStep = "review";
+          renderDocumentAutomation();
+          return showToast("Não foi possível gerar o Word: extraia primeiro o bloco real de SETOR do SOC.", "warning", 5200);
+        }
+        const wordHtml = buildLtcatWordHtml(normalized);
+        const fileName = ltcatWordFileName(normalized);
+        const blob = new Blob(["\ufeff", wordHtml], { type: "application/msword;charset=utf-8" });
+        downloadBlob(blob, fileName);
+        normalized.status = "generated";
+        normalized.generated = {
+          htmlPreview: buildLtcatWordHtml(normalized, { preview: true }),
+          lastGeneratedAt: new Date().toISOString(),
+          fileName
+        };
+        touchDocumentAutomationProject(normalized);
+        documentAutomationDraft = normalized;
+        activeDocumentAutomationProjectId = normalized.id;
+        recordActivity("Gerou Word da automação", fileName);
+        const state = getDocumentAutomation();
+        const index = state.projects.findIndex(item => item.id === normalized.id);
+        if (index < 0) state.projects.unshift(normalized);
+        else state.projects[index] = normalized;
+        app.documentAutomation = normalizeDocumentAutomation(state);
+        saveApp({ fullSave: true });
+        showToast("Word do LTCAT gerado com sucesso.", "success");
+        renderDocumentAutomation();
+      }
+
+      function ltcatWordFileName(project) {
+        const fields = project.manualFields || {};
+        const data = project.extractedData || {};
+        const company = fields.finalCompanyName || project.companyName || data.companyName || "Empresa";
+        const unit = fields.unitName || project.unitName || data.unitName || "";
+        const parts = ["LTCAT", company];
+        if (unit && normalizeText(unit) !== normalizeText(company)) parts.push(unit);
+        const safe = sanitizeFileName(parts.filter(Boolean).join(" - ")) || "LTCAT";
+        return `${safe}.doc`;
+      }
+
+      function getLtcatEprotegeLogoDataUrl() {
+        return "data:image/png;base64,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";
+      }
+
+      function getLtcatCoverCompanyNames(company = "", unit = "") {
+        const normalizeCoverValue = value => {
+          const text = String(value || "").trim();
+          return text === "-" ? "" : text;
+        };
+        const companyText = normalizeCoverValue(company);
+        const unitText = normalizeCoverValue(unit);
+        if (unitText && normalizeText(unitText) !== normalizeText(companyText)) {
+          return { company: companyText || unitText, unit: unitText };
+        }
+        const split = companyText.split(/\s+-\s+/).map(part => part.trim()).filter(Boolean);
+        if (split.length > 1) return { company: split[0], unit: split.slice(1).join(" - ") };
+        return { company: companyText || unitText || "Empresa", unit: "" };
+      }
+
+      function formatLtcatCoverDate(city, month, year) {
+        const cleanCity = city && city !== "-" ? city : "Curitiba";
+        const cleanMonth = String(month || new Date().toLocaleString("pt-BR", { month: "long" })).trim();
+        const monthLabel = cleanMonth ? cleanMonth.charAt(0).toUpperCase() + cleanMonth.slice(1).toLowerCase() : "";
+        return `${cleanCity}, ${monthLabel} de ${year || new Date().getFullYear()}`;
+      }
+
+      function buildLtcatWordHtml(project, options = {}) {
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const company = fields.finalCompanyName || project.companyName || data.companyName || "-";
+        const unit = fields.unitName || project.unitName || data.unitName || "-";
+        const city = fields.city || data.city || "-";
+        const year = fields.emissionYear || new Date().getFullYear();
+        const month = fields.emissionMonth || new Date().toLocaleString("pt-BR", { month: "long" });
+        const companyLogo = project.sourceFiles?.companyLogo?.dataUrl && /^data:image\/(png|jpe?g)/i.test(project.sourceFiles.companyLogo.dataUrl)
+          ? `<img class="ltcat-company-logo" src="${escapeAttr(project.sourceFiles.companyLogo.dataUrl)}" alt="Logo da empresa">`
+          : '<div class="ltcat-company-logo-placeholder">&nbsp;</div>';
+        const eprotegeLogo = getLtcatEprotegeLogoDataUrl()
+          ? `<img class="ltcat-eprotege-logo" src="${escapeAttr(getLtcatEprotegeLogoDataUrl())}" alt="eProtege">`
+          : "";
+        const revisions = (fields.revisionHistory || []).filter(row => row.revision || row.date || row.description);
+        const sectorBlocks = data.riskSectorBlocks || [];
+        const coverNames = getLtcatCoverCompanyNames(company, unit);
+        const elaboratedBy = fields.elaboratedBy || "Beatriz de S. Fraresso Pintor";
+        const responsibleRole = fields.responsibleRole || "Eng. de Segurança do Trabalho";
+        const coverDate = formatLtcatCoverDate(city, month, year);
+        const companyLabel = [company, unit].filter(Boolean).filter((value, index, array) => index === 0 || normalizeText(value) !== normalizeText(array[0])).join(" - ") || company || unit || "Empresa";
+        const modelText = buildLtcatModelText(companyLabel, fields);
+        const body = `
+          <div class="ltcat-document">
+            <section class="ltcat-cover">
+              <div class="ltcat-cover-topbar"><span></span></div>
+              <div class="ltcat-cover-title-block">
+                <h1>LTCAT</h1>
+                <h2>LAUDO TÉCNICO DAS CONDIÇÕES AMBIENTAIS<br>DO TRABALHO</h2>
+                <p>Decreto n 3.048/99</p>
+              </div>
+              <div class="ltcat-cover-company">
+                ${companyLogo}
+                <h3>${wordPlainHtml(coverNames.company)}</h3>
+                ${coverNames.unit ? `<p>${wordPlainHtml(coverNames.unit)}</p>` : ""}
+              </div>
+              <div class="ltcat-cover-elaborated">
+                <p class="ltcat-elaborated-label">ELABORADO PELA:</p>
+                ${eprotegeLogo}
+                <p class="ltcat-elaborated-name">${wordPlainHtml(elaboratedBy)}</p>
+                <p class="ltcat-elaborated-role">${wordPlainHtml(responsibleRole)}</p>
+                <p class="ltcat-elaborated-date">${wordPlainHtml(coverDate)}</p>
+              </div>
+              <div class="ltcat-cover-footer">
+                <strong>ePROTEGE Medicina e Segurança do Trabalho</strong><br>
+                Rua Professor Fernando Moreira, 357<br>
+                Centro - Curitiba / PR<br>
+                Telefone: (41) 3278-1663<br>
+                <strong>www.protege.med.br</strong>
+              </div>
+            </section>
+
+            ${ltcatWordSection("Histórico de revisões", ltcatWordTable(["Revisão", "Data", "Descrição da revisão"], revisions.length ? revisions.map(row => [row.revision || "-", row.date || "-", row.description || "-"]) : [["00", fields.currentRevisionDate || data.issueDate || "-", fields.revisionDescription || "Emissão inicial do LTCAT."]]))}
+            ${ltcatWordSection("Sumário", ltcatWordTable(["Item", "Seção"], [
+              ["1", "Identificação da empresa"],
+              ["2", "Apresentação"],
+              ["3", "Objetivo"],
+              ["4", "Período de Vigência"],
+              ["5", "Metodologia"],
+              ["6", "Matriz de Risco"],
+              ["7", "Enquadramento de Aposentadoria Especial"],
+              ["8", "Conclusão Geral"],
+              ["9", "Termo de Encerramento"],
+              ["10", "Referências Bibliográficas"],
+              ["11", "Anexos"]
+            ]))}
+            ${ltcatWordSection("Identificação da empresa", ltcatWordTable(["Campo", "Informação"], [
+              ["Empresa", company],
+              ["Unidade", unit],
+              ["CNPJ", data.cnpj || "-"],
+              ["Endereço", data.address || "-"],
+              ["CEP", data.cep || "-"],
+              ["Cidade/UF", [city, data.state].filter(Boolean).join(" / ") || "-"],
+              ["CNAE", data.cnae || "-"],
+              ["Grau de risco", data.riskDegree || "-"]
+            ]))}
+            ${ltcatWordSection("Hierarquia", ltcatWordTable(["Setores identificados", "Cargos identificados"], [[(data.hierarchy?.sectors || []).join("\n") || "-", (data.hierarchy?.roles || []).join("\n") || "-"]]))}
+            ${ltcatWordSection("Apresentação", ltcatParagraph(modelText.presentation))}
+            ${ltcatWordSection("Objetivo", ltcatParagraph(modelText.objective))}
+            ${ltcatWordSection("Período de vigência", ltcatParagraph(modelText.validity))}
+            ${ltcatWordSection("Metodologia", ltcatParagraph(modelText.methodology))}
+            ${ltcatWordSection("Matriz de risco", ltcatParagraph(modelText.riskMatrix))}
+            ${ltcatWordSection("Enquadramento de aposentadoria especial", ltcatParagraph(modelText.specialRetirement))}
+            ${ltcatWordSection("Enquadramento Previdenciário", ltcatParagraph("Os setores da empresa foram avaliados de forma qualitativa e com medições quantitativas conforme foram notadas demandas, sendo consideradas as exposições de riscos no ambiente de trabalho por funções. A documentação técnica abaixo foi extraída do relatório LTCAT gerado pelo SOC e preservada para revisão e assinatura no Word."))}
+            ${sectorBlocks.length ? renderLtcatRawRiskSectorBlocks(sectorBlocks) : ltcatWordSection("Blocos de riscos por setor", ltcatParagraph("Nenhum bloco iniciado por SETOR foi extraído automaticamente. Retorne à revisão e use o botão Extrair riscos do SOC."))}
+            ${ltcatWordSection("Conclusão geral", ltcatParagraph(fields.generalConclusion || modelText.generalConclusion))}
+            ${fields.generalNotes ? ltcatWordSection("Observações gerais", ltcatParagraph(fields.generalNotes)) : ""}
+            ${ltcatWordSection("Termo de encerramento", ltcatParagraph(modelText.closingTerm))}
+            ${ltcatWordSection("Referências bibliográficas", ltcatParagraph(modelText.references))}
+            ${ltcatWordSection("Anexos", ltcatParagraph("Inserir anexos técnicos, certificados, medições, evidências fotográficas e demais documentos de apoio, quando aplicável."))}
+            <div class="ltcat-footer">SATS - Automação de Documentos | LTCAT Beta</div>
+          </div>`;
+
+        const styles = `
+          <style>
+            @page WordSection1 { size: 21cm 29.7cm; margin: 1.2cm 1.25cm; }
+            div.WordSection1 { page: WordSection1; }
+            body { font-family: "Times New Roman", Times, serif; color: #000000; font-size: 11pt; line-height: 1.45; }
+            .ltcat-document { max-width: none; margin: 0 auto; background: #ffffff; color: #000000; }
+            .ltcat-cover { position: relative; height: 25.7cm; min-height: 25.7cm; page-break-after: always; break-after: page; overflow: hidden; }
+            .ltcat-cover-topbar { position: relative; height: 0.92cm; background: #1f3b61; margin: 0 0 1.35cm; }
+            .ltcat-cover-topbar span { position: absolute; right: 0; bottom: -0.18cm; display: block; width: 6.1cm; height: 0.38cm; background: #9db3d8; }
+            .ltcat-cover-title-block { text-align: center; color: #000000; }
+            .ltcat-cover-title-block h1 { margin: 0 0 0.16cm; font-family: "Century Gothic", Arial, sans-serif; font-size: 32pt; font-weight: 700; text-decoration: underline; letter-spacing: 0; }
+            .ltcat-cover-title-block h2 { margin: 0; font-family: "Century Gothic", Arial, sans-serif; font-size: 24pt; font-weight: 700; line-height: 1.18; text-decoration: underline; letter-spacing: 0; }
+            .ltcat-cover-title-block p { margin: 0.18cm 0 0; font-family: "Times New Roman", Times, serif; font-size: 10pt; font-weight: 700; }
+            .ltcat-cover-company { margin: 3.05cm 0 0; text-align: center; font-family: "Times New Roman", Times, serif; color: #000000; }
+            .ltcat-company-logo { display: block; width: auto; max-width: 3.45cm; max-height: 3.45cm; margin: 0 auto 0.15cm; }
+            .ltcat-company-logo-placeholder { width: 3.45cm; height: 3.1cm; margin: 0 auto 0.15cm; }
+            .ltcat-cover-company h3 { margin: 0.04cm 0 0; font-size: 18pt; line-height: 1.18; font-weight: 700; color: #000000; }
+            .ltcat-cover-company p { margin: 0.28cm 0 0; font-size: 18pt; line-height: 1.18; font-weight: 700; color: #000000; }
+            .ltcat-cover-elaborated { margin-top: 3.45cm; text-align: center; font-family: Arial, sans-serif; color: #000000; }
+            .ltcat-elaborated-label { margin: 0 0 0.25cm; font-size: 9pt; font-weight: 400; }
+            .ltcat-eprotege-logo { display: block; width: 3.1cm; height: auto; margin: 0 auto 0.08cm; }
+            .ltcat-elaborated-name, .ltcat-elaborated-role { margin: 0; font-size: 10.5pt; line-height: 1.15; font-weight: 700; }
+            .ltcat-elaborated-date { margin: 0.44cm 0 0; font-size: 10.5pt; font-weight: 400; }
+            .ltcat-cover-footer { position: absolute; left: 0; right: 0; bottom: 0; min-height: 2.15cm; box-sizing: border-box; padding: 0.24cm 0.4cm 0.18cm; background: #1f3b61; color: #ffffff; text-align: center; font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.16; }
+            .ltcat-cover-footer strong { font-weight: 700; }
+            .ltcat-info-table, .ltcat-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+            .ltcat-section h2 { margin: 22px 0 8px; padding: 7px 9px; background: #1f3b61; color: #fff; font-family: Arial, sans-serif; font-size: 12pt; }
+            .ltcat-section p { margin: 0 0 8px; text-align: justify; }
+            .ltcat-info-table th, .ltcat-info-table td, .ltcat-table th, .ltcat-table td { border: 1px solid #cbd5e1; padding: 6px 7px; vertical-align: top; }
+            .ltcat-info-table th, .ltcat-table th { background: #dbeafe; color: #1e3a8a; font-weight: 700; text-align: left; }
+            .ltcat-sector-page { page-break-before: always; break-before: page; margin: 0 0 16px; }
+            .ltcat-sector-page:first-child { page-break-before: always; break-before: page; }
+            .ltcat-sector-page h2 { margin: 0 0 10px; padding: 7px 9px; background: #1f3b61; color: #fff; font-family: Arial, sans-serif; font-size: 12pt; }
+            .ltcat-soc-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 10px; page-break-inside: avoid; }
+            .ltcat-soc-table td { border: 1px solid #111827; padding: 4px 6px; vertical-align: top; font-size: 8.5pt; line-height: 1.25; color: #111827; }
+            .ltcat-soc-table .ltcat-soc-band td { background: #e5e7eb; color: #111827; font-weight: 700; text-transform: uppercase; }
+            .ltcat-soc-table .ltcat-soc-title td { background: #f3f4f6; color: #111827; font-weight: 700; font-size: 11pt; }
+            .ltcat-soc-table .ltcat-soc-subtitle td { background: #f8fafc; color: #111827; font-weight: 700; }
+            .ltcat-soc-table .ltcat-soc-label td:first-child { background: #f8fafc; font-weight: 700; }
+            .ltcat-soc-spacer { height: 8px; line-height: 8px; font-size: 1pt; }
+            .ltcat-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #cbd5e1; color: #64748b; text-align: center; font-size: 8pt; }
+          </style>`;
+
+        if (options.preview) return `${styles}<div class="WordSection1">${body}</div>`;
+        return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(buildDocumentAutomationTitle(project))}</title>
+  ${styles}
+</head>
+<body>
+  <div class="WordSection1">${body}</div>
+</body>
+</html>`;
+      }
+
+      function buildLtcatModelText(companyName, fields = {}) {
+        const company = companyName || "Empresa";
+        const revisionDate = fields.currentRevisionDate || "";
+        return {
+          presentation: "O Laudo Técnico de Condições Ambientais do Trabalho, daqui para a frente chamado apenas de LTCAT, é o documento oficial para caracterizar as condições ambientais de trabalho para fins de aposentadoria especial.\n\nQuando a atividade especial é caracterizada através do LTCAT, é possível aposentar-se após cumprir 25, 20 ou 15 anos de contribuição, conforme o caso, sujeito a condições especiais que prejudiquem a saúde ou a integridade física. Além do tempo de contribuição, é necessário que o segurado cumpra os demais requisitos exigidos na legislação previdenciária.",
+          objective: `O LTCAT tem por objetivo analisar e verificar a existência de agentes nocivos à saúde do trabalhador, para fins de obtenção de aposentadoria especial, conforme Art. 58 da Lei 8.213/91.\n\nDeste modo, para elaboração deste documento iremos realizar análise qualitativa e/ou quantitativa, quando se fizer necessário, dos riscos físicos, químicos e biológicos existentes nos postos e setores de trabalho em que os trabalhadores da empresa ${company} exercem suas tarefas cotidianas.\n\nO LTCAT é a fonte oficial de informações para preenchimento do Perfil Profissiográfico Previdenciário - PPP.`,
+          validity: revisionDate
+            ? `As informações registradas neste documento foram revisadas em ${revisionDate} e podem se manter atuais por período indeterminado, ou até que ocorram modificações no ambiente de trabalho, novos atendimentos à legislação, incorporação de novas atividades, alteração de metodologias ou melhorias do processo produtivo.`
+            : "As informações registradas neste documento podem se manter atuais por período indeterminado, ou até que ocorram modificações no ambiente de trabalho, novos atendimentos à legislação, incorporação de novas atividades, alteração de metodologias ou melhorias do processo produtivo.",
+          methodology: `No presente LTCAT serão informados os agentes nocivos constatados e que podem implicar em aposentadoria especial para os trabalhadores da empresa ${company}.\n\nForam considerados os dados técnicos disponíveis no relatório do SOC, a hierarquia de setores e cargos, as avaliações qualitativas e quantitativas informadas, os registros de medições, as medidas de prevenção e controle e os pareceres técnicos apresentados no documento base.`,
+          riskMatrix: "Para aplicação da Matriz de Risco, neste documento estaremos nos referenciando na metodologia de MULHAUSEN & DAMIANO (1998) e pelo apêndice D da BS 8800 (BSI, 1996). A relação se dá através da Probabilidade (P) x Gravidade (G), devendo a classificação ser conferida tecnicamente conforme as informações do ambiente avaliado.",
+          specialRetirement: "Em relação à avaliação qualitativa, a descrição das circunstâncias de exposição ocupacional, fontes de liberação, meios de contato, intensidade, frequência e duração da exposição deve ser considerada para confirmação do enquadramento previdenciário. Quando houver avaliação quantitativa, devem ser observados os limites de tolerância, metodologias de avaliação e legislação previdenciária aplicável.",
+          generalConclusion: `Para as avaliações realizadas neste LTCAT que determinam os direitos previdenciários, foram analisadas as exposições dos riscos físicos, químicos e biológicos por função no ambiente de trabalho, onde foram verificados primeiramente os riscos de forma qualitativa, seguidas de medições pontuais quantitativas quando aplicáveis, registradas de forma mais abrangente no levantamento de riscos para elaboração do Programa de Gerenciamento de Riscos (PGR) da ${company}. O Laudo Previdenciário deve ser utilizado no preenchimento do Perfil Profissiográfico Previdenciário (PPP) dos funcionários.\n\nO presente Laudo cita as funções atuais da empresa e, portanto, é considerado um laudo técnico coletivo e deve ser reavaliado sempre que novas medidas de controle administrativas ou medidas de proteção coletiva sejam instaladas, ou ocorra mudança de espaço físico, equipamentos, atividades, processo de trabalho ou outras alterações que venham a modificar as condições ambientais de riscos dos funcionários.\n\nDeve ser implementado o Mapa de Risco em cada setor da empresa, assim como a lista de Equipamentos de Proteção Individual (EPI) que devem ser utilizados em cada setor, a fim de proporcionar a melhoria da informação e gestão dos riscos existentes.\n\nAs recomendações previstas neste Laudo Técnico das Condições de Ambiente de Trabalho NÃO desobrigam a empresa a cumprir outras disposições que, com relação à matéria, estejam incluídas em Códigos de Obras do Município, Regulamentos Sanitários dos Estados ou outras oriundas de convenções e acordos coletivos de trabalho.`,
+          closingTerm: "Havendo concluído este Laudo, segue assinatura do Responsável Técnico pela elaboração.",
+          references: "ABNT. Manual de normas técnicas.\nBRASIL. Consolidação das Leis do Trabalho - CLT.\nBRASIL. Lei nº 8.212, de 24 de julho de 1991.\nBRASIL. Lei nº 8.213, de 24 de julho de 1991.\nBRASIL. Decreto nº 3.048, de 06 de maio de 1999.\nBRASIL. Instrução Normativa nº 77, de 21 de janeiro de 2015.\nFUNDACENTRO. Normas de Higiene Ocupacional aplicáveis.\nNormas Regulamentadoras do Ministério do Trabalho aplicáveis."
+        };
+      }
+
+      function ltcatWordSection(title, content) {
+        return `<section class="ltcat-section"><h2>${escapeHtml(title)}</h2>${content}</section>`;
+      }
+
+      function ltcatParagraph(value) {
+        const parts = String(value || "-").split(/\n+/).map(part => part.trim()).filter(Boolean);
+        return parts.map(part => `<p>${wordPlainHtml(part)}</p>`).join("") || "<p>-</p>";
+      }
+
+      function ltcatWordTable(headers, rows) {
+        return `<table class="ltcat-table">
+          <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+          <tbody>${(rows || []).map(row => `<tr>${row.map(cell => `<td>${cell == null || cell === "" ? "-" : wordPlainHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+        </table>`;
+      }
+
+      function renderLtcatRawRiskSectorBlocks(sectorBlocks) {
+        return (sectorBlocks || []).map((block, index) => `
+          <section class="ltcat-sector-page">
+            <h2>${escapeHtml(block.title || `Setor ${index + 1}`)}</h2>
+            ${renderLtcatSocSectorTables(block.rawText || "")}
+          </section>
+        `).join("");
+      }
+
+      function renderLtcatSocSectorTables(rawText = "") {
+        const lines = String(rawText || "").replace(/\r\n?/g, "\n").split("\n");
+        const tables = [];
+        let rows = [];
+        const flush = () => {
+          if (!rows.length) return;
+          tables.push(renderLtcatSocTable(rows));
+          rows = [];
+        };
+        lines.forEach(line => {
+          const cleaned = String(line || "").replace(/\u00a0/g, " ").trim();
+          if (!cleaned) {
+            flush();
+            return;
+          }
+          if (/^\.$/.test(cleaned)) {
+            flush();
+            tables.push('<div class="ltcat-soc-spacer">&nbsp;</div>');
+            return;
+          }
+          const cells = splitLtcatSocRowCells(line);
+          if (!cells.length) {
+            flush();
+            return;
+          }
+          rows.push(cells);
+        });
+        flush();
+        return tables.join("") || `<p>${wordPlainHtml(rawText || "-")}</p>`;
+      }
+
+      function splitLtcatSocRowCells(line = "") {
+        const source = String(line || "").replace(/\u00a0/g, " ");
+        const pieces = source.includes("\t")
+          ? source.split(/\t+/)
+          : source.split(/\s{3,}/);
+        const cells = pieces.map(value => value.trim()).filter(Boolean);
+        return cells.length ? cells : [source.trim()].filter(Boolean);
+      }
+
+      function renderLtcatSocTable(rows = []) {
+        const maxCells = Math.max(1, ...rows.map(row => row.length));
+        const colgroup = renderLtcatSocColgroup(maxCells);
+        const body = rows.map((row, index) => {
+          const rowClass = ltcatSocRowClass(row, index);
+          return `<tr class="${rowClass}">${row.map((cell, cellIndex) => {
+            const colspan = ltcatSocCellColspan(row, cellIndex, maxCells);
+            return `<td${colspan > 1 ? ` colspan="${colspan}"` : ""}>${wordPlainHtml(cell)}</td>`;
+          }).join("")}</tr>`;
+        }).join("");
+        return `<table class="ltcat-soc-table">${colgroup}<tbody>${body}</tbody></table>`;
+      }
+
+      function renderLtcatSocColgroup(maxCells = 1) {
+        if (maxCells <= 1) return "<colgroup><col style=\"width:100%\"></colgroup>";
+        if (maxCells === 2) return "<colgroup><col style=\"width:28%\"><col style=\"width:72%\"></colgroup>";
+        if (maxCells === 3) return "<colgroup><col style=\"width:25%\"><col style=\"width:25%\"><col style=\"width:50%\"></colgroup>";
+        if (maxCells === 4) return "<colgroup><col style=\"width:25%\"><col style=\"width:25%\"><col style=\"width:25%\"><col style=\"width:25%\"></colgroup>";
+        return `<colgroup>${Array.from({ length: maxCells }, () => `<col style="width:${(100 / maxCells).toFixed(2)}%">`).join("")}</colgroup>`;
+      }
+
+      function ltcatSocCellColspan(row, cellIndex, maxCells) {
+        if (!Array.isArray(row) || row.length >= maxCells) return 1;
+        if (row.length === 1) return maxCells;
+        if (cellIndex === row.length - 1) return Math.max(1, maxCells - row.length + 1);
+        return 1;
+      }
+
+      function ltcatSocRowClass(row = [], index = 0) {
+        const first = normalizeText(row[0] || "").trim();
+        const joined = normalizeText(row.join(" ")).trim();
+        if (/^(setor|cargo|identificacao|avaliação|avaliacao|criterio|medicao|prevenção e controle|prevencao e controle|parecer tecnico|conclusao da aposentadoria especial)$/.test(first)) {
+          return "ltcat-soc-band";
+        }
+        if (/^especificacao dos perigos|^especificação dos perigos/.test(joined)) return "ltcat-soc-title";
+        if (index <= 2 && row.length === 1) return "ltcat-soc-title";
+        if (row.length === 2 && /^(descricao|fundamentacao legal|possiveis lesoes|fontes ou circunstancias|meio de propagacao|perfil de exposicao|acoes necessarias|parecer tecnico)$/.test(first)) {
+          return "ltcat-soc-label";
+        }
+        if (/^(grupo|codigo esocial|perigo|probabilidade|gravidade|nivel de risco|empresa|tecnica utilizada|data da medicao|medicao|nivel de acao|lt)$/.test(first)) {
+          return "ltcat-soc-subtitle";
+        }
+        return "";
+      }
+
+      function ltcatRiskWordBlock(risk, index) {
+        const rows = [
+          ["Grupo", risk.grupo || "-"],
+          ["Código eSocial", risk.codigoESocial || "-"],
+          ["Perigo/Fator de Risco", risk.perigo || "-"],
+          ["Descrição", risk.descricao || "-"],
+          ["Fundamentação legal", risk.fundamentacaoLegal || "-"],
+          ["Possíveis lesões ou agravos à saúde", risk.possiveisLesoes || "-"],
+          ["Fontes ou circunstâncias", risk.fontesCircunstancias || "-"],
+          ["Meio de propagação", risk.meioPropagacao || "-"],
+          ["Critério de avaliação", risk.criterioAvaliacao || "-"],
+          ["Perfil de exposição", risk.perfilExposicao || "-"],
+          ["Probabilidade", risk.probabilidade || "-"],
+          ["Gravidade", risk.gravidade || "-"],
+          ["Nível de risco", risk.nivelRisco || "-"],
+          ["Medição", ltcatMeasurementText(risk.medicao)],
+          ["Prevenção e controle", risk.prevencaoControle || "-"],
+          ["Parecer técnico", risk.parecerTecnico || "-"],
+          ["Conclusão da aposentadoria especial", risk.conclusaoAposentadoria || "-"]
+        ];
+        return `
+          <h3 class="ltcat-risk-title">${index + 1}. ${wordPlainHtml(risk.perigo || "Risco sem título")}</h3>
+          <p class="ltcat-risk-subtitle"><strong>Setor:</strong> ${wordPlainHtml(risk.setor || "-")} | <strong>Cargo:</strong> ${wordPlainHtml(risk.cargo || "-")}</p>
+          ${ltcatWordTable(["Campo", "Informação"], rows)}`;
+      }
+
+      function ltcatMeasurementText(measurement = {}) {
+        const parts = [
+          ["Empresa", measurement.empresa],
+          ["Técnica", measurement.tecnica],
+          ["Equipamento", measurement.equipamento],
+          ["Data", measurement.data],
+          ["Valor", measurement.valor],
+          ["Nível de ação", measurement.nivelAcao],
+          ["Limite de tolerância", measurement.limiteTolerancia]
+        ].filter(([, value]) => value);
+        return parts.length ? parts.map(([label, value]) => `${label}: ${value}`).join("\n") : "-";
       }
 
       function getAllManagementProfiles() {
@@ -12360,6 +14965,16 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         const choice = event.currentTarget.dataset.appChoice;
         if (choice === "procedures") {
           selectedPortalApp = "procedures";
+          renderApp();
+          return;
+        }
+        if (choice === "documentAutomation") {
+          selectedPortalApp = "documentAutomation";
+          if (canAccessDocumentAutomation()) {
+            recordActivity("Acessou Automação de Documentos", "Abriu o módulo beta de automação.");
+          } else {
+            recordActivity("Tentou acessar Automação de Documentos", `Acesso bloqueado para ${currentUser?.email || "usuário"}.`);
+          }
           renderApp();
           return;
         }
