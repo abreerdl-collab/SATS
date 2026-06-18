@@ -1,0 +1,1 @@
+(function () { "use strict"; window.SATS = window.SATS || {}; window.SATS.modules = window.SATS.modules || {}; window.SATS.modules.management = window.SATS.modules.management || { name: "Gestão SATS" }; })();

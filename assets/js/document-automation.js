@@ -1,0 +1,1 @@
+(function () { "use strict"; window.SATS = window.SATS || {}; window.SATS.modules = window.SATS.modules || {}; window.SATS.modules.documentAutomation = window.SATS.modules.documentAutomation || { name: "Automação de Documentos" }; })();

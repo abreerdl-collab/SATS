@@ -1,0 +1,1 @@
+(function () { "use strict"; window.SATS = window.SATS || {}; window.SATS.modules = window.SATS.modules || {}; window.SATS.modules.planAction = window.SATS.modules.planAction || { name: "Plano de Ação" }; })();
