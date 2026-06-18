@@ -197,6 +197,7 @@
       let richToolbarUserMoved = false;
       let richToolbarDragState = null;
       let selectedPortalApp = null;
+      let portalRouteApplied = false;
       let activeDocumentAutomationProjectId = "";
       let documentAutomationDraft = null;
       let activeDocumentAutomationStep = "type";
@@ -359,6 +360,88 @@
         ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click", "input"].forEach(eventName => {
           document.addEventListener(eventName, () => resetInactivityTimer(), { passive: true, capture: true });
         });
+      }
+
+      const PORTAL_ROUTES = {
+        plans: "plano-de-acao",
+        procedures: "procedimentos",
+        management: "gestao-sats",
+        documentAutomation: "automacao-de-documentos"
+      };
+
+      const PORTAL_ROUTE_ALIASES = {
+        "": null,
+        "index.html": null,
+        "plano-de-acao": "plans",
+        "modulo-1": "plans",
+        plans: "plans",
+        procedimentos: "procedures",
+        "modulo-2": "procedures",
+        procedures: "procedures",
+        "gestao-sats": "management",
+        gestao: "management",
+        "modulo-3": "management",
+        management: "management",
+        "automacao-de-documentos": "documentAutomation",
+        automacao: "documentAutomation",
+        "modulo-4": "documentAutomation",
+        documentautomation: "documentAutomation"
+      };
+
+      function appBasePath() {
+        const pathname = window.location.pathname || "/";
+        if (/^\/SATS$/i.test(pathname)) return "/SATS/";
+        const projectMarker = "/SATS/";
+        const lowerPath = pathname.toLowerCase();
+        const markerIndex = lowerPath.indexOf(projectMarker.toLowerCase());
+        if (markerIndex >= 0) return pathname.slice(0, markerIndex + projectMarker.length);
+        if (pathname.endsWith("/")) return pathname;
+        return pathname.replace(/\/[^/]*$/, "/") || "/";
+      }
+
+      function normalizePortalRoute(value) {
+        return String(value || "")
+          .replace(/^\/+|\/+$/g, "")
+          .replace(/\/index\.html$/i, "")
+          .toLowerCase();
+      }
+
+      function routeAppFromLocation() {
+        const query = new URLSearchParams(window.location.search || "");
+        const queryRoute = normalizePortalRoute(query.get("route") || query.get("app") || "");
+        if (Object.prototype.hasOwnProperty.call(PORTAL_ROUTE_ALIASES, queryRoute)) return PORTAL_ROUTE_ALIASES[queryRoute];
+
+        const base = appBasePath();
+        const pathname = window.location.pathname || "/";
+        const relativePath = pathname.toLowerCase().startsWith(base.toLowerCase())
+          ? pathname.slice(base.length)
+          : pathname.replace(/^\/+/, "");
+        const route = normalizePortalRoute(decodeURIComponent(relativePath));
+        if (Object.prototype.hasOwnProperty.call(PORTAL_ROUTE_ALIASES, route)) return PORTAL_ROUTE_ALIASES[route];
+        return null;
+      }
+
+      function portalRouteUrl(appChoice) {
+        const base = appBasePath();
+        const slug = PORTAL_ROUTES[appChoice] || "";
+        return window.location.origin + base + (slug ? slug : "");
+      }
+
+      function syncPortalRoute(appChoice, { replace = false } = {}) {
+        if (!window.history || !window.history.pushState) return;
+        const targetUrl = portalRouteUrl(appChoice);
+        if (window.location.href === targetUrl) return;
+        const method = replace ? "replaceState" : "pushState";
+        window.history[method]({ satsApp: appChoice || "" }, document.title, targetUrl);
+      }
+
+      function applyRouteFromLocation() {
+        selectedPortalApp = routeAppFromLocation();
+      }
+
+      function handlePortalRoutePopState() {
+        applyRouteFromLocation();
+        renderApp();
       }
 
       init();
@@ -946,6 +1029,7 @@
         document.getElementById("backToAppSelectorBtn").addEventListener("click", showAppSelector);
         document.getElementById("managementBackBtn").addEventListener("click", showAppSelector);
         window.addEventListener("message", handlePortalMessage);
+        window.addEventListener("popstate", handlePortalRoutePopState);
         if (els.proceduresFrame) els.proceduresFrame.addEventListener("load", syncProceduresAdminMode);
         document.querySelectorAll("[data-app-choice]").forEach(button => {
           button.addEventListener("click", handleAppChoice);
@@ -3359,6 +3443,14 @@
         if (renderMaintenanceGate()) {
           [els.appSelectorScreen, els.documentAutomationScreen, els.proceduresScreen, els.managementScreen, els.profileScreen, els.folderScreen, els.editorScreen].forEach(screen => screen.classList.add("hidden"));
           return;
+        }
+
+        if (!portalRouteApplied) {
+          applyRouteFromLocation();
+          portalRouteApplied = true;
+          syncPortalRoute(selectedPortalApp, { replace: true });
+        } else {
+          syncPortalRoute(selectedPortalApp);
         }
 
         const showSelector = !selectedPortalApp;

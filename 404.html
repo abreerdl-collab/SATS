@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SATS</title>
+  <script>
+    (function () {
+      var projectBase = "/SATS/";
+      var path = window.location.pathname || projectBase;
+      var lowerPath = path.toLowerCase();
+      var baseIndex = lowerPath.indexOf(projectBase.toLowerCase());
+      var route = "";
+      if (baseIndex >= 0) {
+        route = path.slice(baseIndex + projectBase.length).replace(/^\/+|\/+$/g, "");
+      }
+      var target = projectBase + (route ? "?route=" + encodeURIComponent(route) : "");
+      window.location.replace(target + (window.location.hash || ""));
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecionando para o SATS...</p>
+</body>
+</html>
