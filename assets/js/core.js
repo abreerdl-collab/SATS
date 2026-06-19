@@ -2474,8 +2474,26 @@
           technicalResponsible: data.technicalResponsible || "",
           hierarchy: {
             sectors: Array.isArray(data.hierarchy?.sectors) ? data.hierarchy.sectors : [],
-            roles: Array.isArray(data.hierarchy?.roles) ? data.hierarchy.roles : []
+            roles: Array.isArray(data.hierarchy?.roles) ? data.hierarchy.roles : [],
+            rows: Array.isArray(data.hierarchy?.rows) ? data.hierarchy.rows.map(row => ({
+              sector: row.sector || "",
+              role: row.role || "",
+              employees: row.employees || ""
+            })) : []
           },
+          employeeSummary: data.employeeSummary && typeof data.employeeSummary === "object" ? {
+            total: data.employeeSummary.total || "",
+            men: data.employeeSummary.men || "",
+            women: data.employeeSummary.women || ""
+          } : { total: "", men: "", women: "" },
+          cipaData: data.cipaData && typeof data.cipaData === "object" ? {
+            rows: Array.isArray(data.cipaData.rows) ? data.cipaData.rows.map(row => ({
+              label: row.label || "",
+              titular: row.titular || "",
+              suplente: row.suplente || "",
+              designado: row.designado || ""
+            })) : []
+          } : { rows: [] },
           risks: Array.isArray(data.risks) ? data.risks.map(normalizeLtcatRisk) : [],
           synthesis: Array.isArray(data.synthesis) ? data.synthesis : [],
           rawSocText: data.rawSocText || data.rawText || "",
@@ -4031,6 +4049,10 @@
           .filter(([label, value]) => !optionalLabels.has(label) && !String(value || "").trim())
           .map(([label]) => label);
         const sectorNames = blocks.map((block, index) => block.title || `Setor ${index + 1}`);
+        const structuredRisks = extractStructuredLtcatRiskBlocks(project);
+        const roleCount = structuredRisks.sectors.reduce((sum, sector) => sum + (sector.roles || []).length, 0);
+        const riskCount = structuredRisks.sectors.reduce((sum, sector) => sum + (sector.roles || []).reduce((roleSum, role) => roleSum + (role.riskBlocks || []).length, 0), 0);
+        const hierarchyRows = data.hierarchy?.rows || [];
         const warnings = data.riskExtractionWarnings || [];
         return `
           <div class="document-automation-preview-grid">
@@ -4060,6 +4082,22 @@
             <section class="document-automation-card">
               <h3>Avisos</h3>
               <p>${warnings.length ? escapeHtml(warnings.join(" ")) : "A Síntese do SOC não será inserida no LTCAT."}</p>
+            </section>
+            <section class="document-automation-card">
+              <h3>Debug da geração</h3>
+              ${ltcatWordTable(["Verificação", "Status"], [
+                ["Modelo padrão carregado", "Sim"],
+                ["Capa preservada", "Sim, o SATS altera o DOCX original sem recriar a capa"],
+                ["Logo central preservada", "Sim, as mídias do template não são removidas"],
+                ["CNPJ encontrado", data.cnpj ? "Sim" : "Não"],
+                ["CNAE encontrado", data.cnae ? "Sim" : "Não"],
+                ["Endereço encontrado", data.address ? "Sim" : "Não"],
+                ["Hierarquia encontrada", hierarchyRows.length ? `Sim, ${hierarchyRows.length} linha(s)` : "Não"],
+                ["Setores de risco", String(blocks.length)],
+                ["Cargos extraídos", String(roleCount)],
+                ["Blocos de risco extraídos", String(riskCount)],
+                ["Marcador de inserção", "ENQUADRAMENTO PREVIDENCIÁRIO / Colar documentação gerada no SOC"]
+              ])}
             </section>
           </div>`;
       }
@@ -4640,17 +4678,79 @@
         return {
           companyName,
           unitName,
-          cnpj: cnpjMatch ? cnpjMatch[0] : "",
+          cnpj: extractLtcatCnpj(clean) || (cnpjMatch ? cnpjMatch[0] : ""),
           address,
-          cep: cepMatch ? cepMatch[0] : "",
+          cep: extractLtcatCep(clean) || (cepMatch ? cepMatch[0] : ""),
           city: cityState.city,
           state: cityState.state,
-          cnae: extractCnae(clean),
-          riskDegree: extractRiskGrade(clean),
+          cnae: extractLtcatCnae(clean) || extractCnae(clean),
+          riskDegree: extractLtcatRiskGrade(clean) || extractRiskGrade(clean),
           issueDate: findDateNear(clean, ["Emitido em", "Data de emissão", "Emissão", "Data do documento"]),
           technicalResponsible: findSocValue(clean, ["Responsável Técnico", "Responsável pela elaboração", "Elaborado por"]),
-          hierarchy: extractLtcatHierarchy(lines)
+          hierarchy: extractLtcatHierarchy(lines),
+          employeeSummary: extractLtcatEmployeeSummary(clean),
+          cipaData: extractLtcatCipaData(clean)
         };
+      }
+
+      function extractLtcatCnpj(text = "") {
+        const compact = String(text || "").replace(/\s+/g, " ");
+        const formatted = compact.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+        if (formatted) return formatted[0];
+        const loose = compact.match(/\b(\d{2})\D{0,2}(\d{3})\D{0,2}(\d{3})\D{0,2}(\d{4})\D{0,2}(\d{2})\b/);
+        return loose ? `${loose[1]}.${loose[2]}.${loose[3]}/${loose[4]}-${loose[5]}` : "";
+      }
+
+      function extractLtcatCep(text = "") {
+        const match = String(text || "").replace(/\s+/g, " ").match(/\b\d{5}-?\d{3}\b/);
+        if (!match) return "";
+        return match[0].replace(/^(\d{5})(\d{3})$/, "$1-$2");
+      }
+
+      function extractLtcatCnae(text = "") {
+        const lines = normalizeSocText(text).split("\n").map(line => line.trim()).filter(Boolean);
+        for (let index = 0; index < lines.length; index += 1) {
+          const normalized = normalizeText(lines[index]);
+          if (!/(^|\b)(cnae|codigo cnae|atividade economica|classificacao nacional de atividades economicas)\b/.test(normalized)) continue;
+          const sameLine = lines[index].replace(/.*?(CNAE|Código CNAE|Atividade Econômica|Classificação Nacional de Atividades Econômicas)\s*:?\s*/i, "").trim();
+          const candidates = [sameLine, lines[index + 1], lines[index + 2], lines[index + 3]].filter(Boolean);
+          const found = candidates.find(value => /\d{2,4}[\.\-]?\d?\/?\d{0,2}/.test(value));
+          if (found) return found.replace(/^\s*[-:]\s*/, "").trim();
+        }
+        return "";
+      }
+
+      function extractLtcatRiskGrade(text = "") {
+        const clean = normalizeSocText(text);
+        const direct = clean.match(/grau\s+de\s+risco\s*:?\s*([1-4])/i);
+        if (direct) return direct[1];
+        const gr = clean.match(/\bGR\s*:?\s*([1-4])\b/i);
+        return gr ? gr[1] : "";
+      }
+
+      function extractLtcatEmployeeSummary(text = "") {
+        const clean = normalizeSocText(text);
+        const match = clean.match(/Funcion[áa]rios\s+(\d+)\s+homens?\s+(\d+)\s+mulheres?/i);
+        if (match) return { total: String(Number(match[1]) + Number(match[2])), men: match[1], women: match[2] };
+        const total = clean.match(/Funcion[áa]rios\s*:?\s*(\d+)/i);
+        return { total: total ? total[1] : "", men: "", women: "" };
+      }
+
+      function extractLtcatCipaData(text = "") {
+        const lines = normalizeSocText(text).split("\n").map(line => line.trim());
+        const start = findLineIndex(lines, line => /dimensionamento\s+cipa/i.test(normalizeText(line)));
+        const rows = [];
+        if (start >= 0) {
+          for (let index = start + 1; index < Math.min(lines.length, start + 10); index += 1) {
+            const line = lines[index];
+            if (!line || /caracterizacao|caracteriza[cç][aã]o|funcionarios/i.test(normalizeText(line))) break;
+            const parts = splitLtcatSocColumns(line);
+            if (/^(previsto|atual)$/i.test(parts[0] || "")) {
+              rows.push({ label: parts[0] || "", titular: parts[1] || "", suplente: parts[2] || "", designado: parts[3] || "" });
+            }
+          }
+        }
+        return { rows };
       }
 
       function extractCompanyName(text = "") {
@@ -4726,15 +4826,35 @@
       function extractLtcatHierarchy(lines = []) {
         const sectors = [];
         const roles = [];
+        const rows = [];
         const headerIndex = findLineIndex(lines, (_line, index) => isHierarchyHeaderSectorLine(lines, index));
         const firstRealSetor = findFirstRealSetorAfter(lines, headerIndex >= 0 ? headerIndex + 1 : 0);
         if (headerIndex >= 0) {
           const end = firstRealSetor > headerIndex ? firstRealSetor : Math.min(lines.length, headerIndex + 120);
-          for (let index = headerIndex + 3; index < end; index += 2) {
-            const sector = String(lines[index] || "").trim();
-            const role = String(lines[index + 1] || "").trim();
+          let currentSector = "";
+          for (let index = headerIndex + 1; index < end; index += 1) {
+            const line = String(lines[index] || "").trim();
+            if (!line || /^[-.]$/.test(line)) continue;
+            const parts = splitLtcatSocColumns(line);
+            if (!parts.length || /^(setor|cargo|funcionarios?)$/i.test(normalizeText(parts[0]))) continue;
+            let sector = "";
+            let role = "";
+            let employees = "";
+            if (parts.length >= 3) {
+              sector = parts[0];
+              role = parts[1];
+              employees = parts[2];
+              currentSector = sector || currentSector;
+            } else if (parts.length === 2) {
+              sector = currentSector;
+              role = parts[0];
+              employees = parts[1];
+            } else {
+              continue;
+            }
             if (sector && !/^[-.]$/.test(sector)) sectors.push(sector);
             if (role && !/^[-.]$/.test(role) && !/^\d+$/.test(role)) roles.push(role);
+            if (sector || role || employees) rows.push({ sector, role, employees });
           }
         }
         const riskCoreStart = firstRealSetor >= 0 ? firstRealSetor : 0;
@@ -4746,8 +4866,18 @@
         }
         return {
           sectors: uniqueStrings(sectors),
-          roles: uniqueStrings(roles)
+          roles: uniqueStrings(roles),
+          rows
         };
+      }
+
+      function splitLtcatSocColumns(line = "") {
+        const source = String(line || "").replace(/\u00a0/g, " ").trim();
+        if (!source) return [];
+        const byTab = source.split(/\t+/).map(value => value.trim()).filter(Boolean);
+        if (byTab.length > 1) return byTab;
+        const bySpaces = source.split(/\s{2,}/).map(value => value.trim()).filter(Boolean);
+        return bySpaces.length > 1 ? bySpaces : [source];
       }
 
       function extractLtcatCargoNamesFromRiskCore(rawRiskCore = "") {
@@ -4760,6 +4890,208 @@
           }
         }
         return uniqueStrings(roles);
+      }
+
+      function extractStructuredLtcatRiskBlocks(projectOrData) {
+        const data = projectOrData?.extractedData || projectOrData || {};
+        const sectorBlocks = data.riskSectorBlocks || [];
+        return {
+          sectors: sectorBlocks.map((sectorBlock, sectorIndex) => parseStructuredLtcatSector(sectorBlock, sectorIndex)),
+          debug: {}
+        };
+      }
+
+      function parseStructuredLtcatSector(sectorBlock, sectorIndex = 0) {
+        const lines = normalizeLtcatRiskLines(sectorBlock.rawText || "");
+        const sectorName = sectorBlock.title || findLtcatValueAfterLabel(lines, "SETOR") || `Setor ${sectorIndex + 1}`;
+        const firstCargo = findLtcatStandaloneLabelIndex(lines, "CARGO", 0);
+        const summary = lines.slice(0, firstCargo >= 0 ? firstCargo : lines.length)
+          .filter(line => !/^setor\b/i.test(normalizeLtcatSearchText(line)) && normalizeLtcatSearchText(line) !== normalizeLtcatSearchText(sectorName))
+          .join("\n")
+          .trim();
+        const roleStarts = [];
+        for (let index = 0; index < lines.length; index += 1) {
+          if (isLtcatStandaloneLabel(lines[index], "CARGO")) roleStarts.push(index);
+        }
+        const roles = roleStarts.map((start, roleIndex) => {
+          const end = roleStarts[roleIndex + 1] == null ? lines.length : roleStarts[roleIndex + 1];
+          return parseStructuredLtcatRole(lines.slice(start, end), roleIndex);
+        });
+        return { name: sectorName, summary, roles, rawText: sectorBlock.rawText || "" };
+      }
+
+      function parseStructuredLtcatRole(lines, roleIndex = 0) {
+        const name = findLtcatValueAfterLabel(lines, "CARGO") || `Cargo ${roleIndex + 1}`;
+        const gfipLine = lines.find(line => /^GFIP\b/i.test(line.trim())) || "";
+        const gfip = (gfipLine.match(/GFIP\s*:?\s*(.+)$/i) || [])[1] || "";
+        const specStarts = [];
+        for (let index = 0; index < lines.length; index += 1) {
+          if (normalizeLtcatSearchText(lines[index]).startsWith("especificacao dos perigos/fatores de risco")) specStarts.push(index);
+        }
+        const roleDescriptionEnd = specStarts[0] != null ? specStarts[0] : lines.length;
+        const roleDescription = lines.slice(0, roleDescriptionEnd)
+          .filter(line => !isLtcatStandaloneLabel(line, "CARGO"))
+          .filter(line => normalizeLtcatSearchText(line) !== normalizeLtcatSearchText(name))
+          .filter(line => !/^Cargo\b/i.test(line.trim()))
+          .filter(line => !/^GFIP\b/i.test(line.trim()))
+          .join("\n")
+          .trim();
+        const riskBlocks = specStarts.map((start, riskIndex) => {
+          const end = specStarts[riskIndex + 1] == null ? lines.length : specStarts[riskIndex + 1];
+          return parseStructuredLtcatRiskBlock(lines.slice(start, end), riskIndex);
+        });
+        return { name, roleDescription, gfip, riskBlocks, rawText: lines.join("\n") };
+      }
+
+      function parseStructuredLtcatRiskBlock(lines, riskIndex = 0) {
+        const risk = {
+          title: lines[0] || `Risco ${riskIndex + 1}`,
+          group: "",
+          esocialCode: "",
+          hazard: "",
+          description: "",
+          legalBasis: "",
+          healthDamage: "",
+          sources: "",
+          propagation: "",
+          evaluationType: "",
+          criterion: "",
+          exposureProfile: "",
+          probability: "",
+          severity: "",
+          riskLevel: "",
+          measurement: { company: "", technique: "", equipment: "", measurementDate: "", measurementValue: "", actionLevel: "", lt: "" },
+          preventionAndControl: "",
+          technicalOpinion: "",
+          retirementConclusion: { physical: "", chemical: "", biological: "", unspecified: "" },
+          rawText: lines.join("\n")
+        };
+        const headerIndex = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("grupo codigo esocial perigo/fator de risco"));
+        if (headerIndex >= 0 && lines[headerIndex + 1]) {
+          const values = splitLtcatSocColumns(lines[headerIndex + 1]);
+          risk.group = values[0] || "";
+          risk.esocialCode = values[1] || "";
+          risk.hazard = values.slice(2).join(" ") || "";
+        }
+        risk.description = collectLtcatField(lines, "Descrição", ["Fundamentação legal", "Possíveis lesões", "Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
+        risk.legalBasis = collectLtcatField(lines, "Fundamentação legal", ["Possíveis lesões", "Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
+        risk.healthDamage = collectLtcatField(lines, "Possíveis lesões", ["Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
+        risk.sources = collectLtcatField(lines, "Fontes ou circunstâncias", ["Meio de Propagação", "Avaliação"]);
+        risk.propagation = collectLtcatField(lines, "Meio de Propagação", ["Avaliação"]);
+        risk.criterion = collectLtcatStandaloneValue(lines, "Critério", ["Perfil de exposição", "Probabilidade", "Medição", "Prevenção e controle", "Parecer Técnico"]);
+        risk.exposureProfile = collectLtcatField(lines, "Perfil de exposição", ["Probabilidade", "Medição", "Prevenção e controle", "Parecer Técnico"]);
+        const probabilityIndex = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("probabilidade gravidade nivel de risco"));
+        if (probabilityIndex >= 0 && lines[probabilityIndex + 1]) {
+          const values = splitLtcatSocColumns(lines[probabilityIndex + 1]);
+          risk.probability = values[0] || "";
+          risk.severity = values[1] || "";
+          risk.riskLevel = values.slice(2).join(" ") || "";
+        }
+        const measurementHeader = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("empresa tecnica utilizada equipamento"));
+        if (measurementHeader >= 0 && lines[measurementHeader + 1]) {
+          const values = splitLtcatSocColumns(lines[measurementHeader + 1]);
+          risk.measurement.company = values[0] || "";
+          risk.measurement.technique = values[1] || "";
+          risk.measurement.equipment = values.slice(2).join(" ") || "";
+        }
+        const measurementValues = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("data da medicao medicao nivel de acao lt"));
+        if (measurementValues >= 0 && lines[measurementValues + 1]) {
+          const values = splitLtcatSocColumns(lines[measurementValues + 1]);
+          risk.measurement.measurementDate = values[0] || "";
+          risk.measurement.measurementValue = values[1] || "";
+          risk.measurement.actionLevel = values[2] || "";
+          risk.measurement.lt = values[3] || "";
+        }
+        risk.preventionAndControl = collectLtcatField(lines, "Ações necessárias", ["Parecer Técnico", "Conclusão da Aposentadoria Especial"]);
+        risk.technicalOpinion = collectLtcatAfterStandalone(lines, "Parecer Técnico", ["Conclusão da Aposentadoria Especial"]);
+        risk.retirementConclusion = collectLtcatRetirementConclusion(lines);
+        return risk;
+      }
+
+      function normalizeLtcatRiskLines(rawText = "") {
+        return String(rawText || "")
+          .replace(/\r\n?/g, "\n")
+          .split("\n")
+          .map(line => line.replace(/\u00a0/g, " ").trim())
+          .filter(line => line && line !== ".");
+      }
+
+      function isLtcatStandaloneLabel(line = "", label = "") {
+        return normalizeLtcatSearchText(line).replace(/:$/, "") === normalizeLtcatSearchText(label);
+      }
+
+      function findLtcatStandaloneLabelIndex(lines, label, startIndex = 0) {
+        for (let index = startIndex; index < lines.length; index += 1) {
+          if (isLtcatStandaloneLabel(lines[index], label)) return index;
+        }
+        return -1;
+      }
+
+      function findLtcatValueAfterLabel(lines, label) {
+        const index = findLtcatStandaloneLabelIndex(lines, label);
+        return index >= 0 ? (lines[index + 1] || "").trim() : "";
+      }
+
+      function findLtcatLineIndex(lines, matcher) {
+        if (typeof matcher === "function") return lines.findIndex(line => matcher(line));
+        return lines.findIndex(line => matcher.test(line));
+      }
+
+      function collectLtcatField(lines, label, stopLabels = []) {
+        const labelNorm = normalizeLtcatSearchText(label);
+        const start = lines.findIndex(line => normalizeLtcatSearchText(line).startsWith(labelNorm));
+        if (start < 0) return "";
+        const firstLine = normalizeLtcatSearchText(lines[start]) === labelNorm ? "" : repairLtcatMojibake(lines[start]).replace(new RegExp(`^${escapeRegExp(repairLtcatMojibake(label))}\\s*`, "i"), "").trim();
+        const output = firstLine ? [firstLine] : [];
+        for (let index = start + 1; index < lines.length; index += 1) {
+          if (stopLabels.some(stop => normalizeLtcatSearchText(lines[index]).startsWith(normalizeLtcatSearchText(stop)))) break;
+          output.push(lines[index]);
+        }
+        return output.join("\n").trim();
+      }
+
+      function collectLtcatStandaloneValue(lines, label, stopLabels = []) {
+        const start = findLtcatStandaloneLabelIndex(lines, label);
+        if (start < 0) return "";
+        const output = [];
+        for (let index = start + 1; index < lines.length; index += 1) {
+          if (stopLabels.some(stop => normalizeLtcatSearchText(lines[index]).startsWith(normalizeLtcatSearchText(stop)))) break;
+          output.push(lines[index]);
+        }
+        return output.join("\n").trim();
+      }
+
+      function collectLtcatAfterStandalone(lines, label, stopLabels = []) {
+        return collectLtcatStandaloneValue(lines, label, stopLabels);
+      }
+
+      function collectLtcatRetirementConclusion(lines) {
+        const start = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("conclusao da aposentadoria especial"));
+        const result = { physical: "", chemical: "", biological: "", unspecified: "" };
+        if (start < 0) return result;
+        const map = [
+          ["Agente físico", "physical"],
+          ["Agente químico", "chemical"],
+          ["Agente biológico", "biological"],
+          ["Agente inespecífico", "unspecified"]
+        ];
+        map.forEach(([label, key], index) => {
+          const labelIndex = findLtcatLineIndex(lines.slice(start), line => normalizeLtcatSearchText(line) === normalizeLtcatSearchText(label));
+          if (labelIndex < 0) return;
+          const absolute = start + labelIndex;
+          const nextLabel = map[index + 1]?.[0] || "";
+          const values = [];
+          for (let cursor = absolute + 1; cursor < lines.length; cursor += 1) {
+            if (nextLabel && normalizeLtcatSearchText(lines[cursor]) === normalizeLtcatSearchText(nextLabel)) break;
+            values.push(lines[cursor]);
+          }
+          result[key] = values.join("\n").trim();
+        });
+        return result;
+      }
+
+      function escapeRegExp(value = "") {
+        return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       }
 
       function extractCurrentDocumentAutomationProject() {
@@ -4789,9 +5121,12 @@
           extracted.rawRiskWarning = rawRiskResult.error || rawRiskResult.warnings.join(" ");
           extracted.riskExtractionWarnings = rawRiskResult.warnings || [];
           extracted.extractionDebug = rawRiskResult.debug || {};
+          const currentHierarchy = extracted.hierarchy || {};
           extracted.hierarchy = {
-            sectors: rawRiskResult.sectors.map(block => block.title).filter(Boolean),
-            roles: extractLtcatCargoNamesFromRiskCore(rawRiskResult.rawRiskCore || "")
+            ...currentHierarchy,
+            sectors: uniqueStrings([...(currentHierarchy.sectors || []), ...rawRiskResult.sectors.map(block => block.title).filter(Boolean)]),
+            roles: uniqueStrings([...(currentHierarchy.roles || []), ...extractLtcatCargoNamesFromRiskCore(rawRiskResult.rawRiskCore || "")]),
+            rows: currentHierarchy.rows || []
           };
         }
         project.extractedData = extracted;
@@ -5222,12 +5557,13 @@
         const xmlDoc = parser.parseFromString(documentXml, "application/xml");
         if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível ler o XML do modelo padrão de LTCAT.");
         patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project);
+        insertLtcatIdentificationAndHierarchy(xmlDoc, project);
         const markerParagraph = findLtcatMarkerParagraph(xmlDoc);
         if (!markerParagraph) throw new Error(`Marcador "${DEFAULT_LTCAT_TEMPLATE_MARKER}" não encontrado no modelo padrão de LTCAT.`);
         const parent = markerParagraph.parentNode;
         const templatePPr = getFirstChildByLocalName(markerParagraph, "pPr");
-        buildLtcatRiskParagraphs(xmlDoc, project.extractedData?.riskSectorBlocks || [], templatePPr)
-          .forEach(paragraph => parent.insertBefore(paragraph, markerParagraph));
+        renderStructuredLtcatRiskContent(xmlDoc, extractStructuredLtcatRiskBlocks(project).sectors, templatePPr)
+          .forEach(node => parent.insertBefore(node, markerParagraph));
         parent.removeChild(markerParagraph);
         return new XMLSerializer().serializeToString(xmlDoc);
       }
@@ -5261,7 +5597,36 @@
         const XML_NS = "http://www.w3.org/XML/1998/namespace";
         const paragraph = xmlDoc.createElementNS(W_NS, "w:p");
         if (options.templatePPr) paragraph.appendChild(options.templatePPr.cloneNode(true));
+        else if (options.align || options.spacingAfter) {
+          const pPr = xmlDoc.createElementNS(W_NS, "w:pPr");
+          if (options.align) {
+            const jc = xmlDoc.createElementNS(W_NS, "w:jc");
+            jc.setAttributeNS(W_NS, "w:val", options.align);
+            pPr.appendChild(jc);
+          }
+          if (options.spacingAfter) {
+            const spacing = xmlDoc.createElementNS(W_NS, "w:spacing");
+            spacing.setAttributeNS(W_NS, "w:after", String(options.spacingAfter));
+            pPr.appendChild(spacing);
+          }
+          paragraph.appendChild(pPr);
+        }
         const run = xmlDoc.createElementNS(W_NS, "w:r");
+        if (options.bold || options.fontSize || options.color) {
+          const rPr = xmlDoc.createElementNS(W_NS, "w:rPr");
+          if (options.bold) rPr.appendChild(xmlDoc.createElementNS(W_NS, "w:b"));
+          if (options.color) {
+            const color = xmlDoc.createElementNS(W_NS, "w:color");
+            color.setAttributeNS(W_NS, "w:val", options.color);
+            rPr.appendChild(color);
+          }
+          if (options.fontSize) {
+            const sz = xmlDoc.createElementNS(W_NS, "w:sz");
+            sz.setAttributeNS(W_NS, "w:val", String(options.fontSize));
+            rPr.appendChild(sz);
+          }
+          run.appendChild(rPr);
+        }
         if (options.pageBreak) {
           const br = xmlDoc.createElementNS(W_NS, "w:br");
           br.setAttributeNS(W_NS, "w:type", "page");
@@ -5269,10 +5634,264 @@
         }
         const textNode = xmlDoc.createElementNS(W_NS, "w:t");
         textNode.setAttributeNS(XML_NS, "xml:space", "preserve");
-        textNode.textContent = text || "";
+        textNode.textContent = repairLtcatMojibake(text || "");
         run.appendChild(textNode);
         paragraph.appendChild(run);
         return paragraph;
+      }
+
+      function repairLtcatMojibake(value = "") {
+        let text = String(value || "");
+        for (let attempt = 0; attempt < 2 && /[ÃÂ]/.test(text); attempt += 1) {
+          try {
+            const bytes = new Uint8Array(Array.from(text, char => char.charCodeAt(0) & 0xff));
+            const decoded = new TextDecoder("utf-8").decode(bytes);
+            if (!decoded || decoded === text) break;
+            const oldNoise = (text.match(/[ÃÂ]/g) || []).length;
+            const newNoise = (decoded.match(/[ÃÂ]/g) || []).length;
+            if (newNoise > oldNoise) break;
+            text = decoded;
+          } catch (error) {
+            break;
+          }
+        }
+        return text.replace(/\u00c2/g, "");
+      }
+
+      function normalizeLtcatSearchText(value = "") {
+        return normalizeText(repairLtcatMojibake(value));
+      }
+
+      function insertLtcatIdentificationAndHierarchy(xmlDoc, project) {
+        const body = getDocxBody(xmlDoc);
+        if (!body) return;
+        const paragraphs = Array.from(xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "p"));
+        const identificationParagraph = paragraphs.find(paragraph => normalizeText(getDocxParagraphText(paragraph)).includes("identificacao da empresa"));
+        if (!identificationParagraph) return;
+        const bodyNodes = Array.from(body.childNodes || []);
+        const identificationIndex = bodyNodes.indexOf(identificationParagraph);
+        const nextSection = bodyNodes.find((node, index) => index > identificationIndex && node.localName === "p" && normalizeText(getDocxParagraphText(node)).includes("apresentacao"));
+        if (!nextSection) return;
+        Array.from(body.childNodes || []).forEach(node => {
+          const nodeIndex = Array.from(body.childNodes || []).indexOf(node);
+          if (nodeIndex <= identificationIndex || node === nextSection) return;
+          if (nodeIndex < Array.from(body.childNodes || []).indexOf(nextSection) && node.localName === "p" && !getDocxParagraphText(node).trim()) {
+            body.removeChild(node);
+          }
+        });
+        const reference = nextSection.parentNode ? nextSection : null;
+        if (!reference) return;
+        buildLtcatIdentificationSection(xmlDoc, project).forEach(node => body.insertBefore(node, reference));
+        buildLtcatHierarchySection(xmlDoc, project).forEach(node => body.insertBefore(node, reference));
+      }
+
+      function buildLtcatIdentificationSection(xmlDoc, project) {
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const company = fields.finalCompanyName || project.companyName || data.companyName || data.unitName || "";
+        const unit = fields.unitName || project.unitName || data.unitName || "";
+        return [
+          createDocxTable(xmlDoc, [
+            ["Empresa / Unidade", [company, unit].filter(Boolean).join(" - ")],
+            ["CNPJ", data.cnpj || ""],
+            ["EndereÃ§o", data.address || ""],
+            ["CEP", data.cep || ""],
+            ["CNAE", data.cnae || ""],
+            ["Grau de Risco", data.riskDegree || ""]
+          ], { labelWidth: 1900 })
+        ];
+      }
+
+      function buildLtcatHierarchySection(xmlDoc, project) {
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const company = fields.finalCompanyName || project.companyName || data.companyName || data.unitName || "";
+        const unit = fields.unitName || project.unitName || data.unitName || "";
+        const nodes = [
+          createDocxParagraph(xmlDoc, "HIERARQUIA DA EMPRESA", { pageBreak: true, bold: true, fontSize: 28, align: "center", spacingAfter: 180 })
+        ];
+        const summaryRows = [
+          ["Unidade", unit],
+          ["Empresa", company],
+          ["CNPJ", data.cnpj || ""],
+          ["EndereÃ§o", data.address || ""],
+          ["CEP", data.cep || ""],
+          ["CNAE", data.cnae || ""],
+          ["Grau de Risco", data.riskDegree || ""]
+        ].filter(([, value]) => String(value || "").trim());
+        if (summaryRows.length) nodes.push(createDocxTable(xmlDoc, summaryRows, { labelWidth: 1900 }));
+        const employeeRows = [];
+        if (data.employeeSummary?.total) employeeRows.push(["Quantidade de funcionÃ¡rios", data.employeeSummary.total]);
+        if (data.employeeSummary?.men) employeeRows.push(["Homens", data.employeeSummary.men]);
+        if (data.employeeSummary?.women) employeeRows.push(["Mulheres", data.employeeSummary.women]);
+        if (employeeRows.length) {
+          nodes.push(createDocxParagraph(xmlDoc, "CaracterizaÃ§Ã£o dos processos e ambientes de trabalho", { bold: true, fontSize: 24, spacingAfter: 120 }));
+          nodes.push(createDocxTable(xmlDoc, employeeRows, { labelWidth: 2600 }));
+        }
+        if (data.cipaData?.rows?.length) {
+          nodes.push(createDocxParagraph(xmlDoc, "Dimensionamento CIPA", { bold: true, fontSize: 24, spacingAfter: 120 }));
+          nodes.push(createDocxTable(xmlDoc, [["Quadro", "Titular", "Suplente", "Designado"], ...data.cipaData.rows.map(row => [row.label, row.titular, row.suplente, row.designado])], { header: true }));
+        }
+        const hierarchyRows = data.hierarchy?.rows || [];
+        if (hierarchyRows.length) {
+          nodes.push(createDocxParagraph(xmlDoc, "Setores, cargos e funcionÃ¡rios", { bold: true, fontSize: 24, spacingAfter: 120 }));
+          nodes.push(createDocxTable(xmlDoc, [["Setor", "Cargo", "FuncionÃ¡rios"], ...hierarchyRows.map(row => [row.sector, row.role, row.employees])], { header: true }));
+        }
+        return nodes;
+      }
+
+      function renderStructuredLtcatRiskContent(xmlDoc, sectors, templatePPr) {
+        const nodes = [];
+        (sectors || []).forEach((sector, sectorIndex) => {
+          nodes.push(createDocxParagraph(xmlDoc, "SETOR", { pageBreak: true, bold: true, fontSize: 24, align: "center" }));
+          nodes.push(createDocxParagraph(xmlDoc, sector.name || `Setor ${sectorIndex + 1}`, { bold: true, fontSize: 24, align: "center", spacingAfter: 180 }));
+          if (sector.summary) nodes.push(createDocxTable(xmlDoc, [["DescriÃ§Ã£o do setor", sector.summary]], { labelWidth: 1900 }));
+          if (!sector.roles?.length && sector.rawText) {
+            nodes.push(createDocxParagraph(xmlDoc, "ConteÃºdo tÃ©cnico extraÃ­do", { bold: true, fontSize: 22, spacingAfter: 120 }));
+            nodes.push(...createDocxParagraphsFromText(xmlDoc, sector.rawText, { templatePPr }));
+          }
+          (sector.roles || []).forEach((role, roleIndex) => {
+            nodes.push(createDocxParagraph(xmlDoc, roleIndex === 0 ? "CARGO" : "CARGO", { bold: true, fontSize: 22, spacingAfter: 80 }));
+            nodes.push(createDocxParagraph(xmlDoc, role.name || `Cargo ${roleIndex + 1}`, { bold: true, fontSize: 22, spacingAfter: 120 }));
+            const roleRows = [];
+            if (role.roleDescription) roleRows.push(["DescriÃ§Ã£o do cargo", role.roleDescription]);
+            if (role.gfip) roleRows.push(["GFIP", role.gfip]);
+            if (roleRows.length) nodes.push(createDocxTable(xmlDoc, roleRows, { labelWidth: 1900 }));
+            if (!role.riskBlocks?.length && role.rawText) nodes.push(...createDocxParagraphsFromText(xmlDoc, role.rawText, { templatePPr }));
+            (role.riskBlocks || []).forEach((risk, riskIndex) => {
+              nodes.push(createDocxParagraph(xmlDoc, risk.title || `EspecificaÃ§Ã£o dos perigos/fatores de risco - Cargo ${role.name || roleIndex + 1}`, { bold: true, fontSize: 22, color: "1F3763", spacingAfter: 120 }));
+              nodes.push(createDocxTable(xmlDoc, [["IdentificaÃ§Ã£o"]], { fullHeader: true }));
+              nodes.push(createDocxTable(xmlDoc, [
+                ["Grupo", "CÃ³digo eSocial", "Perigo/Fator de Risco"],
+                [risk.group, risk.esocialCode, risk.hazard]
+              ], { header: true }));
+              const details = [
+                ["DescriÃ§Ã£o", risk.description],
+                ["FundamentaÃ§Ã£o legal", risk.legalBasis],
+                ["PossÃ­veis lesÃµes ou agravos Ã  saÃºde", risk.healthDamage],
+                ["Fontes ou circunstÃ¢ncias", risk.sources],
+                ["Meio de PropagaÃ§Ã£o", risk.propagation]
+              ].filter(([, value]) => String(value || "").trim());
+              if (details.length) nodes.push(createDocxTable(xmlDoc, details, { labelWidth: 2300 }));
+              nodes.push(createDocxTable(xmlDoc, [["AvaliaÃ§Ã£o"]], { fullHeader: true }));
+              const evaluationRows = [
+                ["CritÃ©rio", risk.criterion],
+                ["Perfil de exposiÃ§Ã£o", risk.exposureProfile]
+              ].filter(([, value]) => String(value || "").trim());
+              if (evaluationRows.length) nodes.push(createDocxTable(xmlDoc, evaluationRows, { labelWidth: 1900 }));
+              if (risk.probability || risk.severity || risk.riskLevel) {
+                nodes.push(createDocxTable(xmlDoc, [
+                  ["Probabilidade", "Gravidade", "NÃ­vel de risco"],
+                  [risk.probability, risk.severity, risk.riskLevel]
+                ], { header: true }));
+              }
+              const measurement = risk.measurement || {};
+              if (Object.values(measurement).some(Boolean)) {
+                nodes.push(createDocxTable(xmlDoc, [["MediÃ§Ã£o"]], { fullHeader: true }));
+                nodes.push(createDocxTable(xmlDoc, [
+                  ["Empresa", "TÃ©cnica utilizada", "Equipamento"],
+                  [measurement.company, measurement.technique, measurement.equipment],
+                  ["Data da mediÃ§Ã£o", "MediÃ§Ã£o", "NÃ­vel de aÃ§Ã£o", "LT"],
+                  [measurement.measurementDate, measurement.measurementValue, measurement.actionLevel, measurement.lt]
+                ], { headerRows: [0, 2] }));
+              }
+              if (risk.preventionAndControl) {
+                nodes.push(createDocxTable(xmlDoc, [["PrevenÃ§Ã£o e controle"]], { fullHeader: true }));
+                nodes.push(createDocxTable(xmlDoc, [["AÃ§Ãµes necessÃ¡rias", risk.preventionAndControl]], { labelWidth: 1900 }));
+              }
+              if (risk.technicalOpinion) {
+                nodes.push(createDocxTable(xmlDoc, [["Parecer TÃ©cnico"]], { fullHeader: true }));
+                nodes.push(createDocxTable(xmlDoc, [[risk.technicalOpinion]], {}));
+              }
+              const conclusion = risk.retirementConclusion || {};
+              if (Object.values(conclusion).some(Boolean)) {
+                nodes.push(createDocxTable(xmlDoc, [["ConclusÃ£o da Aposentadoria Especial"]], { fullHeader: true }));
+                nodes.push(createDocxTable(xmlDoc, [
+                  ["Agente fÃ­sico", conclusion.physical],
+                  ["Agente quÃ­mico", conclusion.chemical],
+                  ["Agente biolÃ³gico", conclusion.biological],
+                  ["Agente inespecÃ­fico", conclusion.unspecified]
+                ], { labelWidth: 2100 }));
+              }
+              if (riskIndex < (role.riskBlocks || []).length - 1) nodes.push(createDocxParagraph(xmlDoc, "", { spacingAfter: 120 }));
+            });
+          });
+        });
+        return nodes.length ? nodes : [createDocxParagraph(xmlDoc, "", { pageBreak: true, templatePPr })];
+      }
+
+      function createDocxParagraphsFromText(xmlDoc, text, options = {}) {
+        return String(text || "")
+          .replace(/\r\n?/g, "\n")
+          .split("\n")
+          .map(line => createDocxParagraph(xmlDoc, line, options));
+      }
+
+      function createDocxTable(xmlDoc, rows, options = {}) {
+        const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        const table = xmlDoc.createElementNS(W_NS, "w:tbl");
+        const tblPr = xmlDoc.createElementNS(W_NS, "w:tblPr");
+        const tblW = xmlDoc.createElementNS(W_NS, "w:tblW");
+        tblW.setAttributeNS(W_NS, "w:w", "5000");
+        tblW.setAttributeNS(W_NS, "w:type", "pct");
+        tblPr.appendChild(tblW);
+        const borders = xmlDoc.createElementNS(W_NS, "w:tblBorders");
+        ["top", "left", "bottom", "right", "insideH", "insideV"].forEach(edge => {
+          const border = xmlDoc.createElementNS(W_NS, `w:${edge}`);
+          border.setAttributeNS(W_NS, "w:val", "single");
+          border.setAttributeNS(W_NS, "w:sz", "6");
+          border.setAttributeNS(W_NS, "w:space", "0");
+          border.setAttributeNS(W_NS, "w:color", "7F8FA6");
+          borders.appendChild(border);
+        });
+        tblPr.appendChild(borders);
+        table.appendChild(tblPr);
+        (rows || []).forEach((row, rowIndex) => {
+          const tr = xmlDoc.createElementNS(W_NS, "w:tr");
+          const isHeader = options.header && rowIndex === 0 || (options.headerRows || []).includes(rowIndex) || options.fullHeader;
+          (row || []).forEach((cell, cellIndex) => {
+            tr.appendChild(createDocxTableCell(xmlDoc, cell, {
+              bold: isHeader || cellIndex === 0 && row.length === 2,
+              shading: isHeader ? "1F3763" : cellIndex === 0 && row.length === 2 ? "D9EAF7" : "",
+              color: isHeader ? "FFFFFF" : "000000",
+              width: row.length === 2 && cellIndex === 0 ? (options.labelWidth || 2200) : ""
+            }));
+          });
+          table.appendChild(tr);
+        });
+        return table;
+      }
+
+      function createDocxTableCell(xmlDoc, value, options = {}) {
+        const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        const cell = xmlDoc.createElementNS(W_NS, "w:tc");
+        const tcPr = xmlDoc.createElementNS(W_NS, "w:tcPr");
+        if (options.width) {
+          const tcW = xmlDoc.createElementNS(W_NS, "w:tcW");
+          tcW.setAttributeNS(W_NS, "w:w", String(options.width));
+          tcW.setAttributeNS(W_NS, "w:type", "dxa");
+          tcPr.appendChild(tcW);
+        }
+        if (options.shading) {
+          const shd = xmlDoc.createElementNS(W_NS, "w:shd");
+          shd.setAttributeNS(W_NS, "w:fill", options.shading);
+          tcPr.appendChild(shd);
+        }
+        cell.appendChild(tcPr);
+        const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
+        (lines.length ? lines : [""]).forEach(line => {
+          cell.appendChild(createDocxParagraph(xmlDoc, line, {
+            bold: options.bold,
+            color: options.color,
+            fontSize: 20,
+            spacingAfter: 60
+          }));
+        });
+        return cell;
+      }
+
+      function getDocxBody(xmlDoc) {
+        return xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "body")[0] || null;
       }
 
       function patchLtcatTextPlaceholdersInXml(xmlText, project) {
@@ -5285,9 +5904,12 @@
 
       function patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project) {
         const replacements = getLtcatTemplateReplacements(project);
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const month = fields.emissionMonth || "";
         const textNodes = Array.from(xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"));
         textNodes.forEach(node => {
           let value = node.textContent || "";
+          if (/Curitiba,\s*XXX/i.test(value)) value = value.replace(/XXX/g, month || "");
           replacements.forEach(([from, to]) => {
             if (value.includes(from)) value = value.split(from).join(to || "");
           });
