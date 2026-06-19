@@ -5230,7 +5230,7 @@
             ${ltcatWordSection("Metodologia", ltcatParagraph(modelText.methodology))}
             ${ltcatWordSection("Matriz de risco", ltcatParagraph(modelText.riskMatrix))}
             ${ltcatWordSection("Enquadramento de aposentadoria especial", ltcatParagraph(modelText.specialRetirement))}
-            ${ltcatWordSection("Enquadramento Previdenciário", ltcatParagraph("Os setores da empresa foram avaliados de forma qualitativa e com medições quantitativas conforme foram notadas demandas, sendo consideradas as exposições de riscos no ambiente de trabalho por funções. A documentação técnica abaixo foi extraída do relatório LTCAT gerado pelo SOC e preservada para revisão e assinatura no Word."))}
+            ${ltcatWordSection("ENQUADRAMENTO PREVIDENCIÁRIO", ltcatParagraph("Os setores da empresa foram avaliados de forma qualitativa e com medições quantitativas conforme foram notadas demandas, sendo consideradas as exposições de riscos no ambiente de trabalho por funções. A documentação técnica abaixo foi extraída do relatório LTCAT gerado pelo SOC e preservada para revisão e assinatura no Word."))}
             ${sectorBlocks.length ? renderLtcatRawRiskSectorBlocks(sectorBlocks) : ltcatWordSection("Blocos de riscos por setor", ltcatParagraph("Nenhum bloco iniciado por SETOR foi extraído automaticamente. Retorne à revisão e use o botão Extrair riscos do SOC."))}
             ${ltcatWordSection("Conclusão geral", ltcatParagraph(fields.generalConclusion || modelText.generalConclusion))}
             ${fields.generalNotes ? ltcatWordSection("Observações gerais", ltcatParagraph(fields.generalNotes)) : ""}
@@ -5272,7 +5272,7 @@
             .ltcat-info-table th, .ltcat-table th { background: #dbeafe; color: #1e3a8a; font-weight: 700; text-align: left; }
             .ltcat-sector-page { page-break-before: always; break-before: page; margin: 0 0 16px; }
             .ltcat-sector-page:first-child { page-break-before: always; break-before: page; }
-            .ltcat-sector-page h2 { margin: 0 0 10px; padding: 7px 9px; background: #1f3b61; color: #fff; font-family: Arial, sans-serif; font-size: 12pt; }
+            .ltcat-sector-raw-text { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.35; color: #000000; }
             .ltcat-soc-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 10px; page-break-inside: avoid; }
             .ltcat-soc-table td { border: 1px solid #111827; padding: 4px 6px; vertical-align: top; font-size: 8.5pt; line-height: 1.25; color: #111827; }
             .ltcat-soc-table .ltcat-soc-band td { background: #e5e7eb; color: #111827; font-weight: 700; text-transform: uppercase; }
@@ -5334,8 +5334,7 @@
       function renderLtcatRawRiskSectorBlocks(sectorBlocks) {
         return (sectorBlocks || []).map((block, index) => `
           <section class="ltcat-sector-page">
-            <h2>${escapeHtml(block.title || `Setor ${index + 1}`)}</h2>
-            ${renderLtcatSocSectorTables(block.rawText || "")}
+            <div class="ltcat-sector-raw-text">${wordPlainHtml(block.rawText || `SETOR\n${block.title || `Setor ${index + 1}`}`)}</div>
           </section>
         `).join("");
       }
