@@ -3763,7 +3763,6 @@
             <div class="management-panel-head"><div><h2>Upload dos arquivos</h2><small>Limite de 10 MB por arquivo. Arquivos são tratados como dados, sem execução.</small></div></div>
             <div class="document-automation-upload-grid">
               ${renderDocumentAutomationUpload("socFile", "Documento bruto gerado pelo SOC", "Envie aqui o arquivo que vem direto da plataforma SOC.", ".rtf,.doc,.docx,.txt,text/plain,application/rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.socFile, true)}
-              ${renderDocumentAutomationUpload("templateFile", "Modelo interno de LTCAT", "Modelo usado pela empresa para montar o documento final. Na fase 1 fica salvo como referência.", ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.templateFile)}
               ${renderDocumentAutomationUpload("previousDocumentFile", "Documento do ano anterior", "Use para puxar datas, histórico de revisão e informações recorrentes, quando possível.", ".docx,.doc,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.previousDocumentFile)}
               ${renderDocumentAutomationUpload("companyLogo", "Logo da empresa", "PNG ou JPEG para capa e cabeçalho do Word.", ".png,.jpg,.jpeg,image/png,image/jpeg", files.companyLogo)}
             </div>
