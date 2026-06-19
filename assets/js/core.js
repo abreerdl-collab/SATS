@@ -90,6 +90,9 @@
       const SUPER_ADMIN_EMAIL = "abner.l@outlook.com";
       const DOCUMENT_AUTOMATION_OWNER_EMAIL = "abner.l@outlook.com";
       const DOCUMENT_AUTOMATION_MAX_FILE_BYTES = 10 * 1024 * 1024;
+      const DEFAULT_LTCAT_TEMPLATE_URL = "assets/templates/ltcat-modelo-padrao.docx";
+      const DEFAULT_LTCAT_TEMPLATE_NAME = "LTCAT padrão oficial";
+      const DEFAULT_LTCAT_TEMPLATE_MARKER = "Colar documentação gerada no SOC";
       const MANAGEMENT_PHASE_1_EMAILS = new Set([SUPER_ADMIN_EMAIL, "administrativo@protege.med.br"]);
       const MANAGEMENT_PERMISSION_KEYS = [
         "accessManagement", "phase1View", "manageSuggestions", "viewActivity", "deleteLogs",
@@ -2417,6 +2420,7 @@
             previousDocumentFile: normalizeDocumentAutomationFile(sourceFiles.previousDocumentFile),
             companyLogo: normalizeDocumentAutomationFile(sourceFiles.companyLogo)
           },
+          ltcatTemplate: normalizeLtcatTemplate(project.ltcatTemplate),
           extractedData: normalizeLtcatExtractedData(project.extractedData || {}),
           manualFields: normalizeLtcatManualFields(project.manualFields || {}),
           validation: {
@@ -2429,6 +2433,14 @@
             lastGeneratedAt: generated.lastGeneratedAt || "",
             fileName: generated.fileName || ""
           }
+        };
+      }
+
+      function normalizeLtcatTemplate(template = {}) {
+        return {
+          mode: "default",
+          source: DEFAULT_LTCAT_TEMPLATE_URL,
+          name: template.name || DEFAULT_LTCAT_TEMPLATE_NAME
         };
       }
 
@@ -3715,7 +3727,7 @@
           ["review", "4. Revisão"],
           ["complements", "5. Complementos"],
           ["preview", "6. Prévia"],
-          ["generate", "7. Gerar Word"]
+          ["generate", "7. Gerar LTCAT"]
         ];
         return `<nav class="document-automation-stepper" aria-label="Etapas da Automação">${steps.map(([id, label]) => `
           <button class="document-automation-step ${activeDocumentAutomationStep === id ? "is-active" : ""}" type="button" data-doc-step="${id}">${escapeHtml(label)}</button>
@@ -3762,6 +3774,7 @@
           <section class="document-automation-panel">
             <div class="management-panel-head"><div><h2>Upload dos arquivos</h2><small>Limite de 10 MB por arquivo. Arquivos são tratados como dados, sem execução.</small></div></div>
             <div class="document-automation-upload-grid">
+              ${renderDefaultLtcatTemplateCard()}
               ${renderDocumentAutomationUpload("socFile", "Documento bruto gerado pelo SOC", "Envie aqui o arquivo que vem direto da plataforma SOC.", ".rtf,.doc,.docx,.txt,text/plain,application/rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.socFile, true)}
               ${renderDocumentAutomationUpload("previousDocumentFile", "Documento do ano anterior", "Use para puxar datas, histórico de revisão e informações recorrentes, quando possível.", ".docx,.doc,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.previousDocumentFile)}
               ${renderDocumentAutomationUpload("companyLogo", "Logo da empresa", "PNG ou JPEG para capa e cabeçalho do Word.", ".png,.jpg,.jpeg,image/png,image/jpeg", files.companyLogo)}
@@ -3771,6 +3784,16 @@
               <button class="button" type="button" data-doc-step="review">Ir para revisão</button>
             </div>
           </section>`;
+      }
+
+      function renderDefaultLtcatTemplateCard() {
+        return `<div class="document-automation-upload is-wide">
+          <strong>Modelo padrão carregado</strong>
+          <span>LTCAT oficial eProtege</span>
+          <div class="document-automation-file-row">
+            <span>O SATS usará automaticamente o modelo oficial de LTCAT cadastrado no sistema.</span>
+          </div>
+        </div>`;
       }
 
       function renderDocumentAutomationUpload(key, label, description, accept, file, required = false) {
@@ -3968,32 +3991,89 @@
       }
 
       function renderDocumentAutomationPreviewStep(project) {
-        const preview = buildLtcatWordHtml(project, { preview: true });
-        project.generated.htmlPreview = preview;
+        const preview = renderLtcatTemplateGenerationPreview(project);
+        project.generated.htmlPreview = "";
         return `
           <section class="document-automation-panel">
-            <div class="management-panel-head"><div><h2>Prévia do LTCAT</h2><small>Confira capa, dados, histórico e riscos antes de baixar.</small></div></div>
+            <div class="management-panel-head"><div><h2>Prévia da geração do LTCAT</h2><small>Esta prévia mostra os dados que serão aplicados ao modelo oficial. O arquivo final será gerado diretamente no modelo LTCAT padrão.</small></div></div>
             ${renderDocumentAutomationValidation(project)}
             <div class="document-automation-actions" style="margin-bottom:14px">
               <button class="button" type="button" data-doc-step="review">Voltar para revisão</button>
               <button class="button" type="button" data-doc-action="save-project">Salvar projeto</button>
               <button class="button" type="button" data-doc-action="download-json">Baixar dados extraídos JSON</button>
-              <button class="button primary" type="button" data-doc-action="generate-word">Gerar Word</button>
+              <button class="button primary" type="button" data-doc-action="generate-word">Gerar LTCAT</button>
             </div>
             <div class="document-automation-preview">${preview}</div>
           </section>`;
       }
 
+      function renderLtcatTemplateGenerationPreview(project) {
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const blocks = data.riskSectorBlocks || [];
+        const company = fields.finalCompanyName || project.companyName || data.companyName || "";
+        const unit = fields.unitName || project.unitName || data.unitName || "";
+        const foundRows = [
+          ["Modelo", DEFAULT_LTCAT_TEMPLATE_NAME],
+          ["Arquivo interno", DEFAULT_LTCAT_TEMPLATE_URL],
+          ["Empresa", company],
+          ["Unidade", unit],
+          ["CNPJ", data.cnpj],
+          ["Endereço", data.address],
+          ["CEP", data.cep],
+          ["CNAE", data.cnae],
+          ["Grau de risco", data.riskDegree],
+          ["Mês", fields.emissionMonth],
+          ["Ano", fields.emissionYear]
+        ];
+        const optionalLabels = new Set(["Modelo", "Arquivo interno", "Mês", "Ano"]);
+        const missing = foundRows
+          .filter(([label, value]) => !optionalLabels.has(label) && !String(value || "").trim())
+          .map(([label]) => label);
+        const sectorNames = blocks.map((block, index) => block.title || `Setor ${index + 1}`);
+        const warnings = data.riskExtractionWarnings || [];
+        return `
+          <div class="document-automation-preview-grid">
+            <section class="document-automation-card">
+              <h3>Modelo padrão carregado</h3>
+              <p><strong>${escapeHtml(DEFAULT_LTCAT_TEMPLATE_NAME)}</strong></p>
+              <p>O SATS vai abrir este DOCX, substituir o marcador de ENQUADRAMENTO PREVIDENCIÁRIO e baixar um novo .docx.</p>
+            </section>
+            <section class="document-automation-card">
+              <h3>Local de inserção</h3>
+              <p><strong>${escapeHtml(DEFAULT_LTCAT_TEMPLATE_MARKER)}</strong></p>
+              <p>O texto do marcador será removido e substituído pelos blocos extraídos do SOC.</p>
+            </section>
+            <section class="document-automation-card">
+              <h3>Setores extraídos</h3>
+              <p><strong>${blocks.length}</strong> setor(es)</p>
+              <p>${sectorNames.length ? escapeHtml(sectorNames.join(", ")) : "Nenhum setor extraído ainda."}</p>
+            </section>
+            <section class="document-automation-card">
+              <h3>Dados encontrados</h3>
+              ${ltcatWordTable(["Campo", "Valor"], foundRows.map(([label, value]) => [label, value || ""]))}
+            </section>
+            <section class="document-automation-card">
+              <h3>Informações não encontradas</h3>
+              <p>${missing.length ? escapeHtml(missing.join(", ")) : "Nenhuma pendência principal identificada."}</p>
+            </section>
+            <section class="document-automation-card">
+              <h3>Avisos</h3>
+              <p>${warnings.length ? escapeHtml(warnings.join(" ")) : "A Síntese do SOC não será inserida no LTCAT."}</p>
+            </section>
+          </div>`;
+      }
+
       function renderDocumentAutomationGenerateStep(project) {
         return `
           <section class="document-automation-panel">
-            <div class="management-panel-head"><div><h2>Gerar Word</h2><small>O arquivo será gerado como .doc compatível com Microsoft Word, editável e sem RTF.</small></div></div>
+            <div class="management-panel-head"><div><h2>Gerar LTCAT</h2><small>O arquivo será gerado como .docx a partir do modelo oficial cadastrado no SATS.</small></div></div>
             ${renderDocumentAutomationValidation(project)}
             <div class="document-automation-actions">
               <button class="button" type="button" data-doc-action="download-json">Baixar JSON extraído</button>
               <button class="button" type="button" data-doc-action="save-project">Salvar projeto</button>
               <button class="button" type="button" data-doc-action="clear-project">Limpar projeto</button>
-              <button class="button primary" type="button" data-doc-action="generate-word">Gerar Word</button>
+              <button class="button primary" type="button" data-doc-action="generate-word">Gerar LTCAT</button>
             </div>
           </section>`;
       }
@@ -5075,7 +5155,7 @@
         showToast("JSON extraído baixado.", "success");
       }
 
-      function generateLtcatDocument(project) {
+      async function generateLtcatDocument(project) {
         if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
         const normalized = normalizeDocumentAutomationProject(project);
         updateDocumentAutomationValidation(normalized);
@@ -5085,13 +5165,20 @@
           renderDocumentAutomation();
           return showToast("Não foi possível gerar o Word: extraia primeiro o bloco real de SETOR do SOC.", "warning", 5200);
         }
-        const wordHtml = buildLtcatWordHtml(normalized);
-        const fileName = ltcatWordFileName(normalized);
-        const blob = new Blob(["\ufeff", wordHtml], { type: "application/msword;charset=utf-8" });
+        let blob;
+        let fileName;
+        try {
+          const templateBuffer = await loadDefaultLtcatTemplateArrayBuffer();
+          blob = await buildLtcatDocxFromTemplate(normalized, templateBuffer);
+          fileName = ltcatWordFileName(normalized);
+        } catch (error) {
+          console.error("[LTCAT DOCX]", error);
+          return showToast(error?.message || "Não foi possível gerar o LTCAT pelo modelo padrão.", "danger", 7000);
+        }
         downloadBlob(blob, fileName);
         normalized.status = "generated";
         normalized.generated = {
-          htmlPreview: buildLtcatWordHtml(normalized, { preview: true }),
+          htmlPreview: "",
           lastGeneratedAt: new Date().toISOString(),
           fileName
         };
@@ -5109,6 +5196,248 @@
         renderDocumentAutomation();
       }
 
+      async function loadDefaultLtcatTemplateArrayBuffer() {
+        const response = await fetch(DEFAULT_LTCAT_TEMPLATE_URL, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Modelo padrão de LTCAT não encontrado em assets/templates/ltcat-modelo-padrao.docx. Verifique se o arquivo do modelo padrão foi enviado para o repositório.");
+        }
+        return await response.arrayBuffer();
+      }
+
+      async function buildLtcatDocxFromTemplate(project, templateBuffer) {
+        const entries = await readDocxZipEntries(templateBuffer);
+        const documentEntry = entries.get("word/document.xml");
+        if (!documentEntry) throw new Error("O modelo padrão de LTCAT não possui word/document.xml.");
+        documentEntry.data = encodeUtf8(patchLtcatDocumentXml(decodeUtf8(documentEntry.data), project));
+        for (const [name, entry] of entries) {
+          if (/^word\/(?:header|footer)\d*\.xml$/i.test(name)) {
+            entry.data = encodeUtf8(patchLtcatTextPlaceholdersInXml(decodeUtf8(entry.data), project));
+          }
+        }
+        return buildStoredZipBlob(Array.from(entries.values()));
+      }
+
+      function patchLtcatDocumentXml(documentXml, project) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(documentXml, "application/xml");
+        if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível ler o XML do modelo padrão de LTCAT.");
+        patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project);
+        const markerParagraph = findLtcatMarkerParagraph(xmlDoc);
+        if (!markerParagraph) throw new Error(`Marcador "${DEFAULT_LTCAT_TEMPLATE_MARKER}" não encontrado no modelo padrão de LTCAT.`);
+        const parent = markerParagraph.parentNode;
+        const templatePPr = getFirstChildByLocalName(markerParagraph, "pPr");
+        buildLtcatRiskParagraphs(xmlDoc, project.extractedData?.riskSectorBlocks || [], templatePPr)
+          .forEach(paragraph => parent.insertBefore(paragraph, markerParagraph));
+        parent.removeChild(markerParagraph);
+        return new XMLSerializer().serializeToString(xmlDoc);
+      }
+
+      function findLtcatMarkerParagraph(xmlDoc) {
+        const paragraphs = Array.from(xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "p"));
+        return paragraphs.find(paragraph => normalizeText(getDocxParagraphText(paragraph)).includes(normalizeText(DEFAULT_LTCAT_TEMPLATE_MARKER)));
+      }
+
+      function getDocxParagraphText(paragraph) {
+        return Array.from(paragraph.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"))
+          .map(node => node.textContent || "")
+          .join("");
+      }
+
+      function buildLtcatRiskParagraphs(xmlDoc, blocks, templatePPr) {
+        const paragraphs = [];
+        (blocks || []).forEach((block, blockIndex) => {
+          const lines = String(block.rawText || `SETOR\n${block.title || `Setor ${blockIndex + 1}`}`)
+            .replace(/\r\n?/g, "\n")
+            .split("\n");
+          lines.forEach((line, lineIndex) => {
+            paragraphs.push(createDocxParagraph(xmlDoc, line, { pageBreak: lineIndex === 0, templatePPr }));
+          });
+        });
+        return paragraphs.length ? paragraphs : [createDocxParagraph(xmlDoc, "", { pageBreak: true, templatePPr })];
+      }
+
+      function createDocxParagraph(xmlDoc, text, options = {}) {
+        const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        const XML_NS = "http://www.w3.org/XML/1998/namespace";
+        const paragraph = xmlDoc.createElementNS(W_NS, "w:p");
+        if (options.templatePPr) paragraph.appendChild(options.templatePPr.cloneNode(true));
+        const run = xmlDoc.createElementNS(W_NS, "w:r");
+        if (options.pageBreak) {
+          const br = xmlDoc.createElementNS(W_NS, "w:br");
+          br.setAttributeNS(W_NS, "w:type", "page");
+          run.appendChild(br);
+        }
+        const textNode = xmlDoc.createElementNS(W_NS, "w:t");
+        textNode.setAttributeNS(XML_NS, "xml:space", "preserve");
+        textNode.textContent = text || "";
+        run.appendChild(textNode);
+        paragraph.appendChild(run);
+        return paragraph;
+      }
+
+      function patchLtcatTextPlaceholdersInXml(xmlText, project) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+        if (xmlDoc.getElementsByTagName("parsererror").length) return xmlText;
+        patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project);
+        return new XMLSerializer().serializeToString(xmlDoc);
+      }
+
+      function patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project) {
+        const replacements = getLtcatTemplateReplacements(project);
+        const textNodes = Array.from(xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"));
+        textNodes.forEach(node => {
+          let value = node.textContent || "";
+          replacements.forEach(([from, to]) => {
+            if (value.includes(from)) value = value.split(from).join(to || "");
+          });
+          node.textContent = value;
+        });
+      }
+
+      function getLtcatTemplateReplacements(project) {
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const company = fields.finalCompanyName || project.companyName || data.companyName || data.unitName || "";
+        const month = fields.emissionMonth || "";
+        return [
+          ["XXXXX", company],
+          ["xxxxx", company],
+          ["XXX", company],
+          ["MÊS", month],
+          ["MÃŠS", month]
+        ];
+      }
+
+      function getFirstChildByLocalName(node, localName) {
+        return Array.from(node.childNodes || []).find(child => child.localName === localName) || null;
+      }
+
+      async function readDocxZipEntries(arrayBuffer) {
+        const bytes = new Uint8Array(arrayBuffer);
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        const eocdOffset = findZipEndOfCentralDirectory(view);
+        if (eocdOffset < 0) throw new Error("Modelo padrão de LTCAT inválido: pacote DOCX não reconhecido.");
+        const totalEntries = view.getUint16(eocdOffset + 10, true);
+        const centralOffset = view.getUint32(eocdOffset + 16, true);
+        const entries = new Map();
+        let cursor = centralOffset;
+        for (let index = 0; index < totalEntries; index += 1) {
+          if (view.getUint32(cursor, true) !== 0x02014b50) throw new Error("Modelo padrão de LTCAT inválido: diretório ZIP corrompido.");
+          const method = view.getUint16(cursor + 10, true);
+          const compressedSize = view.getUint32(cursor + 20, true);
+          const fileNameLength = view.getUint16(cursor + 28, true);
+          const extraLength = view.getUint16(cursor + 30, true);
+          const commentLength = view.getUint16(cursor + 32, true);
+          const localOffset = view.getUint32(cursor + 42, true);
+          const name = decodeUtf8(bytes.slice(cursor + 46, cursor + 46 + fileNameLength));
+          const localNameLength = view.getUint16(localOffset + 26, true);
+          const localExtraLength = view.getUint16(localOffset + 28, true);
+          const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+          const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+          let data;
+          if (method === 0) data = compressed;
+          else if (method === 8) data = await inflateRawDeflate(compressed);
+          else throw new Error(`O modelo padrão usa compressão ZIP não suportada (${method}).`);
+          entries.set(name, { name, data });
+          cursor += 46 + fileNameLength + extraLength + commentLength;
+        }
+        return entries;
+      }
+
+      function findZipEndOfCentralDirectory(view) {
+        const minOffset = Math.max(0, view.byteLength - 0xffff - 22);
+        for (let offset = view.byteLength - 22; offset >= minOffset; offset -= 1) {
+          if (view.getUint32(offset, true) === 0x06054b50) return offset;
+        }
+        return -1;
+      }
+
+      async function inflateRawDeflate(data) {
+        if (typeof DecompressionStream === "undefined") throw new Error("Este navegador não suporta a leitura local do DOCX padrão. Use Chrome ou Edge atualizado.");
+        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+      }
+
+      function buildStoredZipBlob(entries) {
+        const encoder = new TextEncoder();
+        const parts = [];
+        const centralParts = [];
+        let offset = 0;
+        entries.forEach(entry => {
+          const nameBytes = encoder.encode(entry.name);
+          const data = entry.data instanceof Uint8Array ? entry.data : new Uint8Array(entry.data || []);
+          const crc = crc32(data);
+          const local = new Uint8Array(30 + nameBytes.length);
+          const localView = new DataView(local.buffer);
+          localView.setUint32(0, 0x04034b50, true);
+          localView.setUint16(4, 20, true);
+          localView.setUint16(6, 0x0800, true);
+          localView.setUint16(8, 0, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, data.length, true);
+          localView.setUint32(22, data.length, true);
+          localView.setUint16(26, nameBytes.length, true);
+          local.set(nameBytes, 30);
+          parts.push(local, data);
+          const central = new Uint8Array(46 + nameBytes.length);
+          const centralView = new DataView(central.buffer);
+          centralView.setUint32(0, 0x02014b50, true);
+          centralView.setUint16(4, 20, true);
+          centralView.setUint16(6, 20, true);
+          centralView.setUint16(8, 0x0800, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, data.length, true);
+          centralView.setUint32(24, data.length, true);
+          centralView.setUint16(28, nameBytes.length, true);
+          centralView.setUint32(42, offset, true);
+          central.set(nameBytes, 46);
+          centralParts.push(central);
+          offset += local.length + data.length;
+        });
+        const centralOffset = offset;
+        centralParts.forEach(part => { parts.push(part); offset += part.length; });
+        const eocd = new Uint8Array(22);
+        const eocdView = new DataView(eocd.buffer);
+        eocdView.setUint32(0, 0x06054b50, true);
+        eocdView.setUint16(8, entries.length, true);
+        eocdView.setUint16(10, entries.length, true);
+        eocdView.setUint32(12, offset - centralOffset, true);
+        eocdView.setUint32(16, centralOffset, true);
+        parts.push(eocd);
+        return new Blob(parts, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      }
+
+      function crc32(bytes) {
+        const table = crc32.table || (crc32.table = buildCrc32Table());
+        let crc = 0xffffffff;
+        for (let index = 0; index < bytes.length; index += 1) {
+          crc = (crc >>> 8) ^ table[(crc ^ bytes[index]) & 0xff];
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function buildCrc32Table() {
+        const table = new Uint32Array(256);
+        for (let index = 0; index < 256; index += 1) {
+          let value = index;
+          for (let bit = 0; bit < 8; bit += 1) {
+            value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+          }
+          table[index] = value >>> 0;
+        }
+        return table;
+      }
+
+      function decodeUtf8(bytes) {
+        return new TextDecoder("utf-8").decode(bytes);
+      }
+
+      function encodeUtf8(text) {
+        return new TextEncoder().encode(String(text || ""));
+      }
+
       function ltcatWordFileName(project) {
         const fields = project.manualFields || {};
         const data = project.extractedData || {};
@@ -5117,7 +5446,7 @@
         const parts = ["LTCAT", company];
         if (unit && normalizeText(unit) !== normalizeText(company)) parts.push(unit);
         const safe = sanitizeFileName(parts.filter(Boolean).join(" - ")) || "LTCAT";
-        return `${safe}.doc`;
+        return `${safe}.docx`;
       }
 
       function getLtcatEprotegeLogoDataUrl() {
