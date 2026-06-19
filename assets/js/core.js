@@ -3805,6 +3805,8 @@
             <div class="document-automation-upload-grid">
               ${renderDefaultLtcatTemplateCard()}
               ${renderDocumentAutomationUpload("socFile", "Documento bruto gerado pelo SOC", "Envie aqui o arquivo que vem direto da plataforma SOC.", ".rtf,.doc,.docx,.txt,text/plain,application/rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.socFile, true)}
+              ${renderDocumentAutomationUpload("companyLogo", "Logo da empresa", "PNG, JPG ou JPEG para inserir na capa do LTCAT.", ".png,.jpg,.jpeg,image/png,image/jpeg", files.companyLogo)}
+              ${renderDocumentAutomationUpload("previousDocumentFile", "Documento do ano passado", "Arquivo opcional para referência, histórico, datas e comparação manual.", ".docx,.doc,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.previousDocumentFile)}
             </div>
             <div class="document-automation-actions" style="margin-top:14px">
               <button class="button primary" type="button" data-doc-action="extract-soc">Extrair dados do SOC</button>
@@ -3824,11 +3826,15 @@
       }
 
       function renderDocumentAutomationUpload(key, label, description, accept, file, required = false) {
+        const logoPreview = key === "companyLogo" && file?.dataUrl
+          ? `<div class="document-automation-logo-preview"><img src="${escapeAttr(file.dataUrl)}" alt="Prévia da logo da empresa"></div>`
+          : "";
         return `
           <label class="document-automation-upload ${key === "socFile" ? "is-wide" : ""}">
             <strong>${escapeHtml(label)}${required ? " *" : ""}</strong>
             <span>${escapeHtml(description)}</span>
             <input type="file" data-doc-file="${escapeAttr(key)}" accept="${escapeAttr(accept)}">
+            ${logoPreview}
             ${file ? `<div class="document-automation-file-row"><span>${escapeHtml(file.name)} · ${escapeHtml(formatFileSize(file.size))}</span><button class="button" type="button" data-doc-action="remove-file" data-doc-file-key="${escapeAttr(key)}">Remover</button></div>` : ""}
           </label>`;
       }
@@ -4092,7 +4098,7 @@
             <section class="document-automation-card">
               <h3>Local de inserção</h3>
               <p><strong>${escapeHtml(DEFAULT_LTCAT_TEMPLATE_MARKER)}</strong></p>
-              <p>O texto do marcador será removido e substituído pelos blocos extraídos do SOC.</p>
+              <p>O texto do marcador será removido e substituído pelo conteúdo rico colado dos riscos do SOC.</p>
             </section>
             <section class="document-automation-card">
               <h3>Prévia dos riscos colados</h3>
@@ -4117,6 +4123,8 @@
                 ["Modelo padrão carregado", "Sim"],
                 ["Capa preservada", "Sim, o SATS altera o DOCX original sem recriar a capa"],
                 ["Logo central preservada", "Sim, as mídias do template não são removidas"],
+                ["Logo da empresa enviada", project.sourceFiles?.companyLogo ? "Sim" : "Não"],
+                ["Documento do ano passado enviado", project.sourceFiles?.previousDocumentFile ? "Sim" : "Não"],
                 ["CNPJ encontrado", data.cnpj ? "Sim" : "Não"],
                 ["CNAE encontrado", data.cnae ? "Sim" : "Não"],
                 ["Endereço encontrado", data.address ? "Sim" : "Não"],
@@ -4124,6 +4132,8 @@
                 ["Conteúdo rico colado", hasLtcatRiskPasteContent(paste) ? "Sim" : "Não"],
                 ["RTF capturado", paste.rtf ? "Sim" : "Não"],
                 ["HTML capturado", paste.html ? "Sim" : "Não"],
+                ["Setores detectados nos riscos colados", String(countLtcatPastedSectors(paste))],
+                ["Quebras por setor aplicadas", hasLtcatRiskPasteContent(paste) ? "Sim" : "Não"],
                 ["Marcador de inserção", "ENQUADRAMENTO PREVIDENCIÁRIO / Colar documentação gerada no SOC"],
                 ["altChunk preparado", hasLtcatRiskPasteContent(paste) ? "Sim" : "Não"],
                 ["Imagens do template preservadas", "Sim, o pacote DOCX original é reaproveitado"]
@@ -5397,8 +5407,10 @@
         const documentEntry = entries.get("word/document.xml");
         if (!documentEntry) throw new Error("O modelo padrão de LTCAT não possui word/document.xml.");
         const riskChunk = prepareLtcatRiskAltChunk(project);
+        const logoPart = prepareLtcatCompanyLogoPart(project);
         ensureLtcatAltChunkPackageParts(entries, riskChunk);
-        documentEntry.data = encodeUtf8(patchLtcatDocumentXml(decodeUtf8(documentEntry.data), project, riskChunk.relId));
+        if (logoPart) ensureLtcatCompanyLogoPackageParts(entries, logoPart);
+        documentEntry.data = encodeUtf8(patchLtcatDocumentXml(decodeUtf8(documentEntry.data), project, riskChunk.relId, logoPart?.relId || ""));
         for (const [name, entry] of entries) {
           if (/^word\/(?:header|footer)\d*\.xml$/i.test(name)) {
             entry.data = encodeUtf8(patchLtcatTextPlaceholdersInXml(decodeUtf8(entry.data), project));
@@ -5407,15 +5419,40 @@
         return buildStoredZipBlob(Array.from(entries.values()));
       }
 
+      function prepareLtcatCompanyLogoPart(project) {
+        const dataUrl = project.sourceFiles?.companyLogo?.dataUrl || "";
+        const match = String(dataUrl).match(/^data:image\/(png|jpe?g);base64,(.+)$/i);
+        if (!match) return null;
+        const ext = /^png$/i.test(match[1]) ? "png" : "jpg";
+        return {
+          relId: "rIdLtcatCompanyLogo",
+          name: `word/media/ltcat-company-logo.${ext}`,
+          target: `media/ltcat-company-logo.${ext}`,
+          contentType: ext === "png" ? "image/png" : "image/jpeg",
+          data: base64ToUint8Array(match[2]),
+          extension: ext
+        };
+      }
+
       function prepareLtcatRiskAltChunk(project) {
         const paste = normalizeLtcatRiskPaste(project.ltcatRiskPaste || {});
+        if (paste.html) {
+          return {
+            relId: "rIdLtcatRiskContent",
+            name: "word/ltcat-risk-content.html",
+            target: "ltcat-risk-content.html",
+            contentType: "text/html",
+            data: encodeUtf8(buildLtcatAltChunkHtml(addPageBreaksBeforeLtcatSectorsInHtml(paste.html))),
+            sourceType: "html"
+          };
+        }
         if (paste.rtf) {
           return {
             relId: "rIdLtcatRiskContent",
             name: "word/ltcat-risk-content.rtf",
             target: "ltcat-risk-content.rtf",
             contentType: "application/rtf",
-            data: encodeUtf8(paste.rtf),
+            data: encodeUtf8(addPageBreaksBeforeLtcatSectorsInRtf(paste.rtf)),
             sourceType: "rtf"
           };
         }
@@ -5426,7 +5463,7 @@
           name: "word/ltcat-risk-content.html",
           target: "ltcat-risk-content.html",
           contentType: "text/html",
-          data: encodeUtf8(buildLtcatAltChunkHtml(html)),
+          data: encodeUtf8(buildLtcatAltChunkHtml(addPageBreaksBeforeLtcatSectorsInHtml(html))),
           sourceType: paste.html ? "html" : "text"
         };
       }
@@ -5448,10 +5485,80 @@ p { margin: 0 0 6pt; }
 </html>`;
       }
 
+      function addPageBreaksBeforeLtcatSectorsInHtml(html = "") {
+        const source = sanitizeLtcatPastedHtml(html);
+        if (!source.trim()) return "";
+        const template = document.createElement("template");
+        template.innerHTML = source;
+        const candidates = Array.from(template.content.querySelectorAll("p, div, span, td, th, strong, b"))
+          .filter(node => normalizeLtcatSearchText(node.textContent || "").trim() === "setor");
+        candidates.forEach(node => {
+          const row = node.closest("tr");
+          if (row) {
+            const currentStyle = row.getAttribute("style") || "";
+            if (!/page-break-before|break-before/i.test(currentStyle)) {
+              row.setAttribute("style", `${currentStyle}; page-break-before: always; break-before: page;`);
+            }
+            return;
+          }
+          const paragraphLike = node.closest("table") || node.closest("p, div") || node;
+          if (paragraphLike.previousElementSibling?.dataset?.ltcatSectorBreak === "true") return;
+          const breaker = document.createElement("div");
+          breaker.dataset.ltcatSectorBreak = "true";
+          breaker.setAttribute("style", "page-break-before: always; break-before: page; height: 0; line-height: 0; font-size: 0;");
+          paragraphLike.parentNode?.insertBefore(breaker, paragraphLike);
+        });
+        return template.innerHTML;
+      }
+
+      function addPageBreaksBeforeLtcatSectorsInRtf(rtf = "") {
+        const source = String(rtf || "");
+        if (!source.trim()) return "";
+        return source.replace(/((?:\\par\s*)+)(SETOR)(?=(?:\\par|\\tab|[}\s]))/gi, (match, prefix, label) => {
+          return `${prefix}\\page ${label}`;
+        });
+      }
+
+      function countLtcatPastedSectors(paste = {}) {
+        const normalized = normalizeLtcatRiskPaste(paste);
+        if (normalized.html) {
+          const template = document.createElement("template");
+          template.innerHTML = sanitizeLtcatPastedHtml(normalized.html);
+          const htmlSectors = Array.from(template.content.querySelectorAll("p, div, span, td, th, strong, b"))
+            .filter(node => normalizeLtcatSearchText(node.textContent || "").trim() === "setor");
+          if (htmlSectors.length) return htmlSectors.length;
+        }
+        const text = normalized.text || htmlToPlainText(normalized.html || "") || rtfToPlainTextFallback(normalized.rtf || "");
+        const matches = String(text || "").match(/(^|\n)\s*SETOR\s*(\n|$)/gi);
+        return matches ? matches.length : 0;
+      }
+
+      function htmlToPlainText(html = "") {
+        if (!html) return "";
+        const template = document.createElement("template");
+        template.innerHTML = sanitizeLtcatPastedHtml(html);
+        return template.content.textContent || "";
+      }
+
+      function rtfToPlainTextFallback(rtf = "") {
+        return String(rtf || "")
+          .replace(/\\par[d]?/gi, "\n")
+          .replace(/\\tab/gi, "\t")
+          .replace(/\\'[0-9a-fA-F]{2}/g, "")
+          .replace(/[{}]/g, "")
+          .replace(/\\[a-zA-Z]+-?\d*\s?/g, " ");
+      }
+
       function ensureLtcatAltChunkPackageParts(entries, riskChunk) {
         entries.set(riskChunk.name, { name: riskChunk.name, data: riskChunk.data });
         patchLtcatDocumentRelationships(entries, riskChunk);
         patchLtcatContentTypes(entries, riskChunk);
+      }
+
+      function ensureLtcatCompanyLogoPackageParts(entries, logoPart) {
+        entries.set(logoPart.name, { name: logoPart.name, data: logoPart.data });
+        patchLtcatImageRelationship(entries, logoPart);
+        patchLtcatContentTypes(entries, logoPart);
       }
 
       function patchLtcatDocumentRelationships(entries, riskChunk) {
@@ -5470,6 +5577,26 @@ p { margin: 0 0 6pt; }
         relationship.setAttribute("Id", riskChunk.relId);
         relationship.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk");
         relationship.setAttribute("Target", riskChunk.target);
+        root.appendChild(relationship);
+        entries.set(relsName, { name: relsName, data: encodeUtf8(new XMLSerializer().serializeToString(xmlDoc)) });
+      }
+
+      function patchLtcatImageRelationship(entries, logoPart) {
+        const relsName = "word/_rels/document.xml.rels";
+        const relsEntry = entries.get(relsName);
+        const parser = new DOMParser();
+        const xmlDoc = relsEntry
+          ? parser.parseFromString(decodeUtf8(relsEntry.data), "application/xml")
+          : parser.parseFromString('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>', "application/xml");
+        if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível atualizar a relação da logo no DOCX.");
+        const root = xmlDoc.documentElement;
+        Array.from(root.getElementsByTagNameNS("http://schemas.openxmlformats.org/package/2006/relationships", "Relationship"))
+          .filter(node => node.getAttribute("Id") === logoPart.relId || node.getAttribute("Target") === logoPart.target)
+          .forEach(node => root.removeChild(node));
+        const relationship = xmlDoc.createElementNS("http://schemas.openxmlformats.org/package/2006/relationships", "Relationship");
+        relationship.setAttribute("Id", logoPart.relId);
+        relationship.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+        relationship.setAttribute("Target", logoPart.target);
         root.appendChild(relationship);
         entries.set(relsName, { name: relsName, data: encodeUtf8(new XMLSerializer().serializeToString(xmlDoc)) });
       }
@@ -5493,11 +5620,12 @@ p { margin: 0 0 6pt; }
         entry.data = encodeUtf8(new XMLSerializer().serializeToString(xmlDoc));
       }
 
-      function patchLtcatDocumentXml(documentXml, project, riskChunkRelId = "rIdLtcatRiskContent") {
+      function patchLtcatDocumentXml(documentXml, project, riskChunkRelId = "rIdLtcatRiskContent", companyLogoRelId = "") {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(documentXml, "application/xml");
         if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível ler o XML do modelo padrão de LTCAT.");
         patchLtcatTextPlaceholdersInXmlDocument(xmlDoc, project);
+        if (companyLogoRelId) insertCompanyLogoOnLtcatCover(xmlDoc, project, companyLogoRelId);
         insertLtcatIdentificationAndHierarchy(xmlDoc, project);
         const markerParagraph = findLtcatMarkerParagraph(xmlDoc);
         if (!markerParagraph) throw new Error(`Marcador "${DEFAULT_LTCAT_TEMPLATE_MARKER}" não encontrado no modelo padrão de LTCAT.`);
@@ -5519,6 +5647,116 @@ p { margin: 0 0 6pt; }
         return Array.from(paragraph.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"))
           .map(node => node.textContent || "")
           .join("");
+      }
+
+      function insertCompanyLogoOnLtcatCover(xmlDoc, project, logoRelId) {
+        if (!logoRelId) return;
+        const body = getDocxBody(xmlDoc);
+        if (!body) return;
+        const existingLogo = Array.from(xmlDoc.getElementsByTagNameNS("http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing", "docPr"))
+          .some(node => normalizeText(node.getAttribute("name") || "").includes("logo da empresa"));
+        if (existingLogo) return;
+        const data = normalizeLtcatExtractedData(project.extractedData || {});
+        const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const company = fields.finalCompanyName || project.companyName || data.companyName || "";
+        const unit = fields.unitName || project.unitName || data.unitName || "";
+        const targets = [company, unit].map(value => normalizeText(value)).filter(Boolean);
+        const directParagraphs = Array.from(body.childNodes || []).filter(node => node.localName === "p");
+        const coverParagraphs = directParagraphs.slice(0, 90);
+        let anchor = targets.length
+          ? coverParagraphs.find(paragraph => {
+              const normalized = normalizeText(getDocxParagraphText(paragraph));
+              return normalized && targets.some(target => normalized.includes(target));
+            })
+          : null;
+        if (!anchor) {
+          anchor = coverParagraphs.find(paragraph => normalizeText(getDocxParagraphText(paragraph)).includes("elaborado pela")) || coverParagraphs[12] || null;
+        }
+        if (!anchor || !anchor.parentNode) return;
+        anchor.parentNode.insertBefore(createDocxImageParagraph(xmlDoc, logoRelId, {
+          widthEmu: 1350000,
+          heightEmu: 1350000,
+          name: "Logo da empresa"
+        }), anchor);
+      }
+
+      function createDocxImageParagraph(xmlDoc, relId, options = {}) {
+        const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        const R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+        const A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+        const PIC_NS = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+        const width = String(options.widthEmu || 1350000);
+        const height = String(options.heightEmu || 1350000);
+        const name = options.name || "Logo";
+        const paragraph = xmlDoc.createElementNS(W_NS, "w:p");
+        const pPr = xmlDoc.createElementNS(W_NS, "w:pPr");
+        const jc = xmlDoc.createElementNS(W_NS, "w:jc");
+        jc.setAttributeNS(W_NS, "w:val", "center");
+        pPr.appendChild(jc);
+        paragraph.appendChild(pPr);
+        const run = xmlDoc.createElementNS(W_NS, "w:r");
+        const drawing = xmlDoc.createElementNS(W_NS, "w:drawing");
+        const inline = xmlDoc.createElementNS(WP_NS, "wp:inline");
+        inline.setAttribute("distT", "0");
+        inline.setAttribute("distB", "0");
+        inline.setAttribute("distL", "0");
+        inline.setAttribute("distR", "0");
+        const extent = xmlDoc.createElementNS(WP_NS, "wp:extent");
+        extent.setAttribute("cx", width);
+        extent.setAttribute("cy", height);
+        inline.appendChild(extent);
+        const docPr = xmlDoc.createElementNS(WP_NS, "wp:docPr");
+        docPr.setAttribute("id", "91001");
+        docPr.setAttribute("name", name);
+        inline.appendChild(docPr);
+        const cNvGraphicFramePr = xmlDoc.createElementNS(WP_NS, "wp:cNvGraphicFramePr");
+        const locks = xmlDoc.createElementNS(A_NS, "a:graphicFrameLocks");
+        locks.setAttribute("noChangeAspect", "1");
+        cNvGraphicFramePr.appendChild(locks);
+        inline.appendChild(cNvGraphicFramePr);
+        const graphic = xmlDoc.createElementNS(A_NS, "a:graphic");
+        const graphicData = xmlDoc.createElementNS(A_NS, "a:graphicData");
+        graphicData.setAttribute("uri", "http://schemas.openxmlformats.org/drawingml/2006/picture");
+        const pic = xmlDoc.createElementNS(PIC_NS, "pic:pic");
+        const nvPicPr = xmlDoc.createElementNS(PIC_NS, "pic:nvPicPr");
+        const cNvPr = xmlDoc.createElementNS(PIC_NS, "pic:cNvPr");
+        cNvPr.setAttribute("id", "91002");
+        cNvPr.setAttribute("name", name);
+        nvPicPr.appendChild(cNvPr);
+        nvPicPr.appendChild(xmlDoc.createElementNS(PIC_NS, "pic:cNvPicPr"));
+        pic.appendChild(nvPicPr);
+        const blipFill = xmlDoc.createElementNS(PIC_NS, "pic:blipFill");
+        const blip = xmlDoc.createElementNS(A_NS, "a:blip");
+        blip.setAttributeNS(R_NS, "r:embed", relId);
+        blipFill.appendChild(blip);
+        const stretch = xmlDoc.createElementNS(A_NS, "a:stretch");
+        stretch.appendChild(xmlDoc.createElementNS(A_NS, "a:fillRect"));
+        blipFill.appendChild(stretch);
+        pic.appendChild(blipFill);
+        const spPr = xmlDoc.createElementNS(PIC_NS, "pic:spPr");
+        const xfrm = xmlDoc.createElementNS(A_NS, "a:xfrm");
+        const off = xmlDoc.createElementNS(A_NS, "a:off");
+        off.setAttribute("x", "0");
+        off.setAttribute("y", "0");
+        const ext = xmlDoc.createElementNS(A_NS, "a:ext");
+        ext.setAttribute("cx", width);
+        ext.setAttribute("cy", height);
+        xfrm.appendChild(off);
+        xfrm.appendChild(ext);
+        spPr.appendChild(xfrm);
+        const prstGeom = xmlDoc.createElementNS(A_NS, "a:prstGeom");
+        prstGeom.setAttribute("prst", "rect");
+        prstGeom.appendChild(xmlDoc.createElementNS(A_NS, "a:avLst"));
+        spPr.appendChild(prstGeom);
+        pic.appendChild(spPr);
+        graphicData.appendChild(pic);
+        graphic.appendChild(graphicData);
+        inline.appendChild(graphic);
+        drawing.appendChild(inline);
+        run.appendChild(drawing);
+        paragraph.appendChild(run);
+        return paragraph;
       }
 
       function createDocxParagraph(xmlDoc, text, options = {}) {
@@ -5619,16 +5857,15 @@ p { margin: 0 0 6pt; }
         const fields = normalizeLtcatManualFields(project.manualFields || {});
         const company = fields.finalCompanyName || project.companyName || data.companyName || data.unitName || "";
         const unit = fields.unitName || project.unitName || data.unitName || "";
-        return [
-          createDocxTable(xmlDoc, [
-            ["Empresa / Unidade", [company, unit].filter(Boolean).join(" - ")],
-            ["CNPJ", data.cnpj || ""],
-            ["EndereÃ§o", data.address || ""],
-            ["CEP", data.cep || ""],
-            ["CNAE", data.cnae || ""],
-            ["Grau de Risco", data.riskDegree || ""]
-          ], { labelWidth: 1900 })
-        ];
+        const rows = [
+          ["Empresa / Unidade", [company, unit].filter(Boolean).join(" - ")],
+          ["CNPJ", data.cnpj || ""],
+          ["Endereço", data.address || ""],
+          ["CEP", data.cep || ""],
+          ["CNAE", data.cnae || ""],
+          ["Grau de Risco", data.riskDegree || ""]
+        ].filter(([, value]) => String(value || "").trim());
+        return rows.length ? [createDocxTable(xmlDoc, rows, { labelWidth: 1900 })] : [];
       }
 
       function buildLtcatHierarchySection(xmlDoc, project) {
@@ -5643,18 +5880,18 @@ p { margin: 0 0 6pt; }
           ["Unidade", unit],
           ["Empresa", company],
           ["CNPJ", data.cnpj || ""],
-          ["EndereÃ§o", data.address || ""],
+          ["Endereço", data.address || ""],
           ["CEP", data.cep || ""],
           ["CNAE", data.cnae || ""],
           ["Grau de Risco", data.riskDegree || ""]
         ].filter(([, value]) => String(value || "").trim());
         if (summaryRows.length) nodes.push(createDocxTable(xmlDoc, summaryRows, { labelWidth: 1900 }));
         const employeeRows = [];
-        if (data.employeeSummary?.total) employeeRows.push(["Quantidade de funcionÃ¡rios", data.employeeSummary.total]);
+        if (data.employeeSummary?.total) employeeRows.push(["Quantidade de funcionários", data.employeeSummary.total]);
         if (data.employeeSummary?.men) employeeRows.push(["Homens", data.employeeSummary.men]);
         if (data.employeeSummary?.women) employeeRows.push(["Mulheres", data.employeeSummary.women]);
         if (employeeRows.length) {
-          nodes.push(createDocxParagraph(xmlDoc, "CaracterizaÃ§Ã£o dos processos e ambientes de trabalho", { bold: true, fontSize: 24, spacingAfter: 120 }));
+          nodes.push(createDocxParagraph(xmlDoc, "Caracterização dos processos e ambientes de trabalho", { bold: true, fontSize: 24, spacingAfter: 120 }));
           nodes.push(createDocxTable(xmlDoc, employeeRows, { labelWidth: 2600 }));
         }
         if (data.cipaData?.rows?.length) {
@@ -5663,8 +5900,8 @@ p { margin: 0 0 6pt; }
         }
         const hierarchyRows = data.hierarchy?.rows || [];
         if (hierarchyRows.length) {
-          nodes.push(createDocxParagraph(xmlDoc, "Setores, cargos e funcionÃ¡rios", { bold: true, fontSize: 24, spacingAfter: 120 }));
-          nodes.push(createDocxTable(xmlDoc, [["Setor", "Cargo", "FuncionÃ¡rios"], ...hierarchyRows.map(row => [row.sector, row.role, row.employees])], { header: true }));
+          nodes.push(createDocxParagraph(xmlDoc, "Setores, cargos e funcionários", { bold: true, fontSize: 24, spacingAfter: 120 }));
+          nodes.push(createDocxTable(xmlDoc, [["Setor", "Cargo", "Funcionários"], ...hierarchyRows.map(row => [row.sector, row.role, row.employees])], { header: true }));
         }
         return nodes;
       }
@@ -5900,6 +6137,15 @@ p { margin: 0 0 6pt; }
 
       function encodeUtf8(text) {
         return new TextEncoder().encode(String(text || ""));
+      }
+
+      function base64ToUint8Array(base64 = "") {
+        const binary = atob(String(base64 || ""));
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        return bytes;
       }
 
       function ltcatWordFileName(project) {
