@@ -2421,6 +2421,7 @@
             companyLogo: normalizeDocumentAutomationFile(sourceFiles.companyLogo)
           },
           ltcatTemplate: normalizeLtcatTemplate(project.ltcatTemplate),
+          ltcatRiskPaste: normalizeLtcatRiskPaste(project.ltcatRiskPaste || project.extractedData?.ltcatRiskPaste || {}),
           extractedData: normalizeLtcatExtractedData(project.extractedData || {}),
           manualFields: normalizeLtcatManualFields(project.manualFields || {}),
           validation: {
@@ -2441,6 +2442,16 @@
           mode: "default",
           source: DEFAULT_LTCAT_TEMPLATE_URL,
           name: template.name || DEFAULT_LTCAT_TEMPLATE_NAME
+        };
+      }
+
+      function normalizeLtcatRiskPaste(paste = {}) {
+        return {
+          rtf: paste.rtf || "",
+          html: sanitizeLtcatPastedHtml(paste.html || ""),
+          text: paste.text || "",
+          sourceType: paste.sourceType || (paste.rtf ? "rtf" : paste.html ? "html" : paste.text ? "text" : ""),
+          updatedAt: paste.updatedAt || ""
         };
       }
 
@@ -3794,8 +3805,6 @@
             <div class="document-automation-upload-grid">
               ${renderDefaultLtcatTemplateCard()}
               ${renderDocumentAutomationUpload("socFile", "Documento bruto gerado pelo SOC", "Envie aqui o arquivo que vem direto da plataforma SOC.", ".rtf,.doc,.docx,.txt,text/plain,application/rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.socFile, true)}
-              ${renderDocumentAutomationUpload("previousDocumentFile", "Documento do ano anterior", "Use para puxar datas, histórico de revisão e informações recorrentes, quando possível.", ".docx,.doc,.pdf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document", files.previousDocumentFile)}
-              ${renderDocumentAutomationUpload("companyLogo", "Logo da empresa", "PNG ou JPEG para capa e cabeçalho do Word.", ".png,.jpg,.jpeg,image/png,image/jpeg", files.companyLogo)}
             </div>
             <div class="document-automation-actions" style="margin-top:14px">
               <button class="button primary" type="button" data-doc-action="extract-soc">Extrair dados do SOC</button>
@@ -3827,23 +3836,21 @@
       function renderDocumentAutomationExtractStep(project) {
         const data = project.extractedData || normalizeLtcatExtractedData();
         const text = data.rawSocText || data.rawText || "";
-        const blocks = data.riskSectorBlocks || [];
         return `
           <section class="document-automation-panel">
-            <div class="management-panel-head"><div><h2>Extração automática</h2><small>Campos básicos são lidos por rótulo; riscos são copiados de SETOR até antes de Síntese.</small></div></div>
+            <div class="management-panel-head"><div><h2>Extração automática</h2><small>Campos básicos são lidos por rótulo. Os riscos formatados devem ser colados manualmente na revisão.</small></div></div>
             ${renderDocumentAutomationValidation(project)}
             <div class="document-automation-preview is-wide">
               <h3>Texto extraído do SOC</h3>
               <pre style="white-space:pre-wrap; font:inherit; line-height:1.6; margin:0">${escapeHtml(text ? text.slice(0, 12000) : "Envie o RTF do SOC e clique em Extrair dados do SOC.")}</pre>
             </div>
             <div class="document-automation-preview is-wide">
-              <h3>Bloco técnico extraído do SOC</h3>
-              <p>${blocks.length ? `${blocks.length} setor(es) encontrado(s).` : "Nenhum setor extraído ainda."}</p>
+              <h3>Riscos do SOC</h3>
+              <p>Para preservar tabelas, bordas e formatação, abra o RTF do SOC no Word, copie o trecho dos riscos e cole no campo rico da etapa de revisão.</p>
             </div>
             ${renderLtcatExtractionDebug(data)}
             <div class="document-automation-actions" style="margin-top:14px">
               <button class="button primary" type="button" data-doc-action="extract-soc">Reprocessar extração</button>
-              <button class="button" type="button" data-doc-action="extract-risk-blocks">Extrair riscos do SOC</button>
               <button class="button" type="button" data-doc-step="review">Revisar dados</button>
             </div>
           </section>`;
@@ -3855,59 +3862,82 @@
           <section class="document-automation-panel">
             <div class="management-panel-head"><div><h2>Revisão dos dados extraídos</h2><small>Edite os campos antes de gerar o Word.</small></div></div>
             ${renderDocumentAutomationValidation(project)}
+            ${renderLtcatIdentificationCardEditor(project)}
+            ${renderLtcatHierarchyEditor(project)}
+            ${renderLtcatRiskRichPasteEditor(project)}
+          </section>`;
+      }
+
+      function renderLtcatIdentificationCardEditor(project) {
+        const data = project.extractedData || normalizeLtcatExtractedData();
+        return `
+          <section class="document-automation-preview is-wide">
+            <div class="management-panel-head">
+              <div>
+                <h3>Cartão CNPJ / Identificação da empresa</h3>
+                <small>Esses dados entram na seção 1. Identificação da empresa. Edite apenas o que precisar.</small>
+              </div>
+            </div>
             <div class="document-automation-field-grid">
               ${renderAutomationTextField("companyName", "Empresa", data.companyName, project)}
               ${renderAutomationTextField("unitName", "Unidade", data.unitName, project)}
               ${renderAutomationTextField("cnpj", "CNPJ", data.cnpj, project)}
               ${renderAutomationTextField("address", "Endereço", data.address, project)}
               ${renderAutomationTextField("cep", "CEP", data.cep, project)}
+              ${renderAutomationTextField("cnae", "CNAE", data.cnae, project)}
+              ${renderAutomationTextField("riskDegree", "Grau de Risco", data.riskDegree, project)}
               ${renderAutomationTextField("city", "Cidade", data.city, project)}
               ${renderAutomationTextField("state", "Estado", data.state, project)}
-              ${renderAutomationTextField("cnae", "CNAE", data.cnae, project)}
-              ${renderAutomationTextField("riskDegree", "Grau de risco", data.riskDegree, project)}
               ${renderAutomationTextField("issueDate", "Data de emissão SOC", data.issueDate, project)}
               ${renderAutomationTextField("technicalResponsible", "Responsável técnico", data.technicalResponsible, project, true)}
             </div>
-            <h3>Setores e cargos</h3>
-            <div class="document-automation-field-grid">
-              <label class="field is-wide">Setores encontrados<textarea data-doc-array="hierarchy.sectors" rows="3">${escapeHtml((data.hierarchy?.sectors || []).join("\\n"))}</textarea></label>
-              <label class="field is-wide">Cargos encontrados<textarea data-doc-array="hierarchy.roles" rows="3">${escapeHtml((data.hierarchy?.roles || []).join("\\n"))}</textarea></label>
-            </div>
-            ${renderLtcatRawRiskBlocksEditor(data.riskSectorBlocks || [])}
           </section>`;
       }
 
-      function renderLtcatRawRiskBlocksEditor(blocks) {
-        const count = blocks.length;
+      function renderLtcatHierarchyEditor(project) {
+        const data = project.extractedData || normalizeLtcatExtractedData();
+        const rows = data.hierarchy?.rows || [];
         return `
           <section class="document-automation-preview is-wide">
             <div class="management-panel-head">
               <div>
-                <h3>Bloco técnico extraído do SOC</h3>
-                <small>${count ? `${count} setor(es) encontrado(s). Revise o texto bruto antes de gerar o Word.` : "Nenhum bloco iniciado por SETOR foi extraído ainda."}</small>
-              </div>
-              <div class="management-item-actions">
-                <button class="button" type="button" data-doc-action="extract-risk-blocks">${count ? "Extrair riscos novamente" : "Extrair riscos do SOC"}</button>
-                <button class="button primary" type="button" data-doc-action="save-risk-review">Salvar revisão dos riscos</button>
+                <h3>Hierarquia da empresa</h3>
+                <small>Essa seção será inserida na página seguinte à identificação da empresa.</small>
               </div>
             </div>
-            <div class="document-automation-risk-list">
-              ${blocks.map((block, index) => `
-                <section class="document-automation-risk-raw-block">
-                  <header>
-                    <div>
-                      <strong>Setor: ${escapeHtml(block.title || `Setor ${index + 1}`)}</strong>
-                      <span>Bloco ${index + 1} de ${count}</span>
-                    </div>
-                    <div class="document-automation-risk-raw-actions">
-                      <button class="button" type="button" data-doc-action="move-risk-block-up" data-risk-index="${index}" ${index === 0 ? "disabled" : ""}>Subir</button>
-                      <button class="button" type="button" data-doc-action="move-risk-block-down" data-risk-index="${index}" ${index === count - 1 ? "disabled" : ""}>Descer</button>
-                      <button class="button" type="button" data-doc-action="duplicate-risk-block" data-risk-index="${index}">Duplicar</button>
-                      <button class="button danger" type="button" data-doc-action="delete-risk-block" data-risk-index="${index}">Excluir</button>
-                    </div>
-                  </header>
-                  <textarea data-doc-raw-risk="${index}" rows="14">${escapeHtml(block.rawText || "")}</textarea>
-                </section>`).join("") || '<div class="document-automation-empty">Use o botão "Extrair riscos do SOC" para copiar o trecho entre SETOR e antes de Síntese.</div>'}
+            <div class="document-automation-field-grid">
+              <label class="field is-wide">Setores encontrados<textarea data-doc-array="hierarchy.sectors" rows="3">${escapeHtml((data.hierarchy?.sectors || []).join("\\n"))}</textarea></label>
+              <label class="field is-wide">Cargos encontrados<textarea data-doc-array="hierarchy.roles" rows="3">${escapeHtml((data.hierarchy?.roles || []).join("\\n"))}</textarea></label>
+            </div>
+            ${rows.length ? ltcatWordTable(["Setor", "Cargo", "Funcionários"], rows.map(row => [row.sector || "", row.role || "", row.employees || ""])) : '<div class="document-automation-empty">Nenhuma tabela Setor / Cargo / Funcionários foi identificada automaticamente.</div>'}
+          </section>`;
+      }
+
+      function renderLtcatRiskRichPasteEditor(project) {
+        const paste = normalizeLtcatRiskPaste(project.ltcatRiskPaste || {});
+        const html = paste.html || (paste.text ? plainToRich(paste.text) : "");
+        return `
+          <section class="document-automation-preview is-wide">
+            <div class="management-panel-head">
+              <div>
+                <h3>Riscos do SOC</h3>
+                <small>Cole aqui o trecho dos riscos copiado do RTF gerado pelo SOC. Mantenha a formatação original da tabela.</small>
+              </div>
+              <div class="management-item-actions">
+                <button class="button" type="button" data-doc-action="clear-rich-risk-paste">Limpar riscos colados</button>
+              </div>
+            </div>
+            <div id="ltcatRiskRichPasteArea"
+                 class="ltcat-rich-paste-area"
+                 contenteditable="true"
+                 spellcheck="true"
+                 data-ltcat-risk-paste
+                 data-placeholder="Cole aqui a tabela/trecho de riscos copiado do Word ou RTF do SOC.">${html || ""}</div>
+            <div class="document-automation-validation-list" style="margin-top:12px">
+              <span>Conteúdo rico colado: ${hasLtcatRiskPasteContent(paste) ? "sim" : "não"}</span>
+              <span>RTF capturado: ${paste.rtf ? "sim" : "não"}</span>
+              <span>HTML capturado: ${paste.html ? "sim" : "não"}</span>
+              ${paste.sourceType === "text" ? "<span>Somente texto simples capturado; a formatação pode ser perdida.</span>" : ""}
             </div>
           </section>`;
       }
@@ -4028,6 +4058,7 @@
       function renderLtcatTemplateGenerationPreview(project) {
         const data = normalizeLtcatExtractedData(project.extractedData || {});
         const fields = normalizeLtcatManualFields(project.manualFields || {});
+        const paste = normalizeLtcatRiskPaste(project.ltcatRiskPaste || {});
         const blocks = data.riskSectorBlocks || [];
         const company = fields.finalCompanyName || project.companyName || data.companyName || "";
         const unit = fields.unitName || project.unitName || data.unitName || "";
@@ -4048,12 +4079,9 @@
         const missing = foundRows
           .filter(([label, value]) => !optionalLabels.has(label) && !String(value || "").trim())
           .map(([label]) => label);
-        const sectorNames = blocks.map((block, index) => block.title || `Setor ${index + 1}`);
-        const structuredRisks = extractStructuredLtcatRiskBlocks(project);
-        const roleCount = structuredRisks.sectors.reduce((sum, sector) => sum + (sector.roles || []).length, 0);
-        const riskCount = structuredRisks.sectors.reduce((sum, sector) => sum + (sector.roles || []).reduce((roleSum, role) => roleSum + (role.riskBlocks || []).length, 0), 0);
         const hierarchyRows = data.hierarchy?.rows || [];
         const warnings = data.riskExtractionWarnings || [];
+        const pastedPreview = paste.html || (paste.text ? plainToRich(paste.text) : "");
         return `
           <div class="document-automation-preview-grid">
             <section class="document-automation-card">
@@ -4067,9 +4095,9 @@
               <p>O texto do marcador será removido e substituído pelos blocos extraídos do SOC.</p>
             </section>
             <section class="document-automation-card">
-              <h3>Setores extraídos</h3>
-              <p><strong>${blocks.length}</strong> setor(es)</p>
-              <p>${sectorNames.length ? escapeHtml(sectorNames.join(", ")) : "Nenhum setor extraído ainda."}</p>
+              <h3>Prévia dos riscos colados</h3>
+              ${pastedPreview ? `<div class="ltcat-rich-paste-preview">${pastedPreview}</div>` : `<p>Nenhum conteúdo de riscos foi colado ainda.</p>`}
+              ${paste.rtf && !paste.html ? `<p>O conteúdo RTF foi capturado e será inserido no Word. A prévia visual pode ser limitada.</p>` : ""}
             </section>
             <section class="document-automation-card">
               <h3>Dados encontrados</h3>
@@ -4093,10 +4121,12 @@
                 ["CNAE encontrado", data.cnae ? "Sim" : "Não"],
                 ["Endereço encontrado", data.address ? "Sim" : "Não"],
                 ["Hierarquia encontrada", hierarchyRows.length ? `Sim, ${hierarchyRows.length} linha(s)` : "Não"],
-                ["Setores de risco", String(blocks.length)],
-                ["Cargos extraídos", String(roleCount)],
-                ["Blocos de risco extraídos", String(riskCount)],
-                ["Marcador de inserção", "ENQUADRAMENTO PREVIDENCIÁRIO / Colar documentação gerada no SOC"]
+                ["Conteúdo rico colado", hasLtcatRiskPasteContent(paste) ? "Sim" : "Não"],
+                ["RTF capturado", paste.rtf ? "Sim" : "Não"],
+                ["HTML capturado", paste.html ? "Sim" : "Não"],
+                ["Marcador de inserção", "ENQUADRAMENTO PREVIDENCIÁRIO / Colar documentação gerada no SOC"],
+                ["altChunk preparado", hasLtcatRiskPasteContent(paste) ? "Sim" : "Não"],
+                ["Imagens do template preservadas", "Sim, o pacote DOCX original é reaproveitado"]
               ])}
             </section>
           </div>`;
@@ -4130,6 +4160,7 @@
         root.onclick = handleDocumentAutomationClick;
         root.onchange = handleDocumentAutomationChange;
         root.oninput = handleDocumentAutomationInput;
+        root.onpaste = handleLtcatRiskRichPaste;
       }
 
       async function handleDocumentAutomationClick(event) {
@@ -4177,50 +4208,11 @@
           return;
         }
         if (action === "extract-soc") return extractCurrentDocumentAutomationProject();
-        if (action === "extract-risk-blocks") return extractLtcatRawRisksForCurrentProject();
-        if (action === "save-risk-review") {
-          recordActivity("Editou campos extraídos", "Salvou revisão manual dos riscos brutos do LTCAT.");
-          return saveDocumentAutomationProject(project);
-        }
-        if (action === "move-risk-block-up" || action === "move-risk-block-down") {
-          const index = Number(button.dataset.riskIndex);
-          const blocks = project.extractedData.riskSectorBlocks || [];
-          const target = action === "move-risk-block-up" ? index - 1 : index + 1;
-          if (blocks[index] && blocks[target]) {
-            [blocks[index], blocks[target]] = [blocks[target], blocks[index]];
-            blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
-            touchDocumentAutomationProject(project);
-            renderDocumentAutomation();
-          }
-          return;
-        }
-        if (action === "duplicate-risk-block") {
-          const index = Number(button.dataset.riskIndex);
-          const blocks = project.extractedData.riskSectorBlocks || [];
-          if (blocks[index]) {
-            blocks.splice(index + 1, 0, normalizeLtcatRawRiskSectorBlock({
-              ...blocks[index],
-              id: createId(),
-              title: `${blocks[index].title || `Setor ${index + 1}`} - cópia`,
-              order: index + 2,
-              extractedAt: new Date().toISOString()
-            }, index + 1));
-            blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
-            touchDocumentAutomationProject(project);
-            renderDocumentAutomation();
-          }
-          return;
-        }
-        if (action === "delete-risk-block") {
-          const index = Number(button.dataset.riskIndex);
-          const blocks = project.extractedData.riskSectorBlocks || [];
-          if (!blocks[index]) return;
-          if (!await openConfirmModal({ title: "Excluir setor extraído", message: `O bloco "${blocks[index].title || `Setor ${index + 1}`}" será removido da revisão de riscos.`, confirmLabel: "Excluir bloco", tone: "danger" })) return;
-          blocks.splice(index, 1);
-          blocks.forEach((block, blockIndex) => block.order = blockIndex + 1);
+        if (action === "clear-rich-risk-paste") {
+          project.ltcatRiskPaste = normalizeLtcatRiskPaste();
           touchDocumentAutomationProject(project);
           renderDocumentAutomation();
-          return;
+          return showToast("Conteúdo de riscos limpo.", "success");
         }
         if (action === "save-project") return saveDocumentAutomationProject(project);
         if (action === "download-json") return downloadDocumentAutomationJson(project);
@@ -4291,15 +4283,10 @@
           touchDocumentAutomationProject(project, false);
           return;
         }
-        const rawRiskField = event.target.closest("[data-doc-raw-risk]");
-        if (rawRiskField) {
-          const index = Number(rawRiskField.dataset.docRawRisk);
-          const block = project.extractedData.riskSectorBlocks[index];
-          if (block) {
-            block.rawText = rawRiskField.value;
-            block.title = extractLtcatSectorTitleFromBlock(block.rawText, index) || block.title;
-            touchDocumentAutomationProject(project, false);
-          }
+        const richRiskPaste = event.target.closest("[data-ltcat-risk-paste]");
+        if (richRiskPaste) {
+          saveLtcatRiskPasteFromEditor(project, richRiskPaste, { keepRtf: event.inputType === "insertFromPaste" });
+          touchDocumentAutomationProject(project, false);
           return;
         }
         const revisionField = event.target.closest("[data-doc-revision]");
@@ -4309,6 +4296,82 @@
           if (project.manualFields.revisionHistory[index] && field) project.manualFields.revisionHistory[index][field] = revisionField.value;
           touchDocumentAutomationProject(project, false);
         }
+      }
+
+      function handleLtcatRiskRichPaste(event) {
+        const area = event.target.closest("[data-ltcat-risk-paste]");
+        if (!area) return;
+        const project = getActiveDocumentAutomationProject();
+        const clipboard = event.clipboardData;
+        if (!clipboard) return;
+        const rtf = clipboard.getData("text/rtf") || "";
+        const html = clipboard.getData("text/html") || "";
+        const text = clipboard.getData("text/plain") || "";
+        const safeHtml = sanitizeLtcatPastedHtml(html);
+        const displayHtml = safeHtml || (text ? plainToRich(text) : "");
+        event.preventDefault();
+        area.innerHTML = displayHtml;
+        project.ltcatRiskPaste = normalizeLtcatRiskPaste({
+          rtf,
+          html: safeHtml,
+          text,
+          sourceType: rtf ? "rtf" : safeHtml ? "html" : text ? "text" : "",
+          updatedAt: new Date().toISOString()
+        });
+        touchDocumentAutomationProject(project);
+        if (rtf) showToast("Conteúdo RTF dos riscos capturado.", "success");
+        else if (safeHtml) showToast("Conteúdo HTML dos riscos capturado.", "success");
+        else if (text) showToast("Texto dos riscos colado. A formatação pode ser limitada.", "warning", 5200);
+      }
+
+      function saveLtcatRiskPasteFromEditor(project, area, options = {}) {
+        const html = sanitizeLtcatPastedHtml(area.innerHTML || "");
+        const text = area.innerText || "";
+        const previous = normalizeLtcatRiskPaste(project.ltcatRiskPaste || {});
+        const rtf = options.keepRtf ? previous.rtf : "";
+        project.ltcatRiskPaste = normalizeLtcatRiskPaste({
+          ...previous,
+          rtf,
+          html,
+          text,
+          sourceType: rtf ? "rtf" : html ? "html" : text ? "text" : "",
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      function sanitizeLtcatPastedHtml(html = "") {
+        const source = String(html || "");
+        if (!source.trim()) return "";
+        const template = document.createElement("template");
+        template.innerHTML = source;
+        template.content.querySelectorAll("script, iframe, object, embed").forEach(node => node.remove());
+        template.content.querySelectorAll("style").forEach(node => {
+          node.textContent = String(node.textContent || "")
+            .replace(/@import[^;]+;/gi, "")
+            .replace(/url\s*\(\s*javascript:[^)]+\)/gi, "");
+        });
+        template.content.querySelectorAll("*").forEach(node => {
+          [...node.attributes].forEach(attr => {
+            const name = attr.name.toLowerCase();
+            const value = String(attr.value || "");
+            if (name.startsWith("on")) node.removeAttribute(attr.name);
+            if ((name === "src" || name === "href") && /^\s*javascript:/i.test(value)) node.removeAttribute(attr.name);
+            if (name === "style") {
+              const safeStyle = value
+                .replace(/expression\s*\([^)]*\)/gi, "")
+                .replace(/url\s*\(\s*javascript:[^)]+\)/gi, "");
+              if (safeStyle.trim()) node.setAttribute("style", safeStyle);
+              else node.removeAttribute("style");
+            }
+          });
+        });
+        const body = template.content.querySelector("body");
+        return body ? body.innerHTML : template.innerHTML;
+      }
+
+      function hasLtcatRiskPasteContent(paste = {}) {
+        const normalized = normalizeLtcatRiskPaste(paste);
+        return Boolean(String(normalized.rtf || normalized.html || normalized.text || "").trim());
       }
 
       async function handleDocumentAutomationFile(key, file) {
@@ -4892,208 +4955,6 @@
         return uniqueStrings(roles);
       }
 
-      function extractStructuredLtcatRiskBlocks(projectOrData) {
-        const data = projectOrData?.extractedData || projectOrData || {};
-        const sectorBlocks = data.riskSectorBlocks || [];
-        return {
-          sectors: sectorBlocks.map((sectorBlock, sectorIndex) => parseStructuredLtcatSector(sectorBlock, sectorIndex)),
-          debug: {}
-        };
-      }
-
-      function parseStructuredLtcatSector(sectorBlock, sectorIndex = 0) {
-        const lines = normalizeLtcatRiskLines(sectorBlock.rawText || "");
-        const sectorName = sectorBlock.title || findLtcatValueAfterLabel(lines, "SETOR") || `Setor ${sectorIndex + 1}`;
-        const firstCargo = findLtcatStandaloneLabelIndex(lines, "CARGO", 0);
-        const summary = lines.slice(0, firstCargo >= 0 ? firstCargo : lines.length)
-          .filter(line => !/^setor\b/i.test(normalizeLtcatSearchText(line)) && normalizeLtcatSearchText(line) !== normalizeLtcatSearchText(sectorName))
-          .join("\n")
-          .trim();
-        const roleStarts = [];
-        for (let index = 0; index < lines.length; index += 1) {
-          if (isLtcatStandaloneLabel(lines[index], "CARGO")) roleStarts.push(index);
-        }
-        const roles = roleStarts.map((start, roleIndex) => {
-          const end = roleStarts[roleIndex + 1] == null ? lines.length : roleStarts[roleIndex + 1];
-          return parseStructuredLtcatRole(lines.slice(start, end), roleIndex);
-        });
-        return { name: sectorName, summary, roles, rawText: sectorBlock.rawText || "" };
-      }
-
-      function parseStructuredLtcatRole(lines, roleIndex = 0) {
-        const name = findLtcatValueAfterLabel(lines, "CARGO") || `Cargo ${roleIndex + 1}`;
-        const gfipLine = lines.find(line => /^GFIP\b/i.test(line.trim())) || "";
-        const gfip = (gfipLine.match(/GFIP\s*:?\s*(.+)$/i) || [])[1] || "";
-        const specStarts = [];
-        for (let index = 0; index < lines.length; index += 1) {
-          if (normalizeLtcatSearchText(lines[index]).startsWith("especificacao dos perigos/fatores de risco")) specStarts.push(index);
-        }
-        const roleDescriptionEnd = specStarts[0] != null ? specStarts[0] : lines.length;
-        const roleDescription = lines.slice(0, roleDescriptionEnd)
-          .filter(line => !isLtcatStandaloneLabel(line, "CARGO"))
-          .filter(line => normalizeLtcatSearchText(line) !== normalizeLtcatSearchText(name))
-          .filter(line => !/^Cargo\b/i.test(line.trim()))
-          .filter(line => !/^GFIP\b/i.test(line.trim()))
-          .join("\n")
-          .trim();
-        const riskBlocks = specStarts.map((start, riskIndex) => {
-          const end = specStarts[riskIndex + 1] == null ? lines.length : specStarts[riskIndex + 1];
-          return parseStructuredLtcatRiskBlock(lines.slice(start, end), riskIndex);
-        });
-        return { name, roleDescription, gfip, riskBlocks, rawText: lines.join("\n") };
-      }
-
-      function parseStructuredLtcatRiskBlock(lines, riskIndex = 0) {
-        const risk = {
-          title: lines[0] || `Risco ${riskIndex + 1}`,
-          group: "",
-          esocialCode: "",
-          hazard: "",
-          description: "",
-          legalBasis: "",
-          healthDamage: "",
-          sources: "",
-          propagation: "",
-          evaluationType: "",
-          criterion: "",
-          exposureProfile: "",
-          probability: "",
-          severity: "",
-          riskLevel: "",
-          measurement: { company: "", technique: "", equipment: "", measurementDate: "", measurementValue: "", actionLevel: "", lt: "" },
-          preventionAndControl: "",
-          technicalOpinion: "",
-          retirementConclusion: { physical: "", chemical: "", biological: "", unspecified: "" },
-          rawText: lines.join("\n")
-        };
-        const headerIndex = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("grupo codigo esocial perigo/fator de risco"));
-        if (headerIndex >= 0 && lines[headerIndex + 1]) {
-          const values = splitLtcatSocColumns(lines[headerIndex + 1]);
-          risk.group = values[0] || "";
-          risk.esocialCode = values[1] || "";
-          risk.hazard = values.slice(2).join(" ") || "";
-        }
-        risk.description = collectLtcatField(lines, "Descrição", ["Fundamentação legal", "Possíveis lesões", "Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
-        risk.legalBasis = collectLtcatField(lines, "Fundamentação legal", ["Possíveis lesões", "Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
-        risk.healthDamage = collectLtcatField(lines, "Possíveis lesões", ["Fontes ou circunstâncias", "Meio de Propagação", "Avaliação"]);
-        risk.sources = collectLtcatField(lines, "Fontes ou circunstâncias", ["Meio de Propagação", "Avaliação"]);
-        risk.propagation = collectLtcatField(lines, "Meio de Propagação", ["Avaliação"]);
-        risk.criterion = collectLtcatStandaloneValue(lines, "Critério", ["Perfil de exposição", "Probabilidade", "Medição", "Prevenção e controle", "Parecer Técnico"]);
-        risk.exposureProfile = collectLtcatField(lines, "Perfil de exposição", ["Probabilidade", "Medição", "Prevenção e controle", "Parecer Técnico"]);
-        const probabilityIndex = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("probabilidade gravidade nivel de risco"));
-        if (probabilityIndex >= 0 && lines[probabilityIndex + 1]) {
-          const values = splitLtcatSocColumns(lines[probabilityIndex + 1]);
-          risk.probability = values[0] || "";
-          risk.severity = values[1] || "";
-          risk.riskLevel = values.slice(2).join(" ") || "";
-        }
-        const measurementHeader = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("empresa tecnica utilizada equipamento"));
-        if (measurementHeader >= 0 && lines[measurementHeader + 1]) {
-          const values = splitLtcatSocColumns(lines[measurementHeader + 1]);
-          risk.measurement.company = values[0] || "";
-          risk.measurement.technique = values[1] || "";
-          risk.measurement.equipment = values.slice(2).join(" ") || "";
-        }
-        const measurementValues = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("data da medicao medicao nivel de acao lt"));
-        if (measurementValues >= 0 && lines[measurementValues + 1]) {
-          const values = splitLtcatSocColumns(lines[measurementValues + 1]);
-          risk.measurement.measurementDate = values[0] || "";
-          risk.measurement.measurementValue = values[1] || "";
-          risk.measurement.actionLevel = values[2] || "";
-          risk.measurement.lt = values[3] || "";
-        }
-        risk.preventionAndControl = collectLtcatField(lines, "Ações necessárias", ["Parecer Técnico", "Conclusão da Aposentadoria Especial"]);
-        risk.technicalOpinion = collectLtcatAfterStandalone(lines, "Parecer Técnico", ["Conclusão da Aposentadoria Especial"]);
-        risk.retirementConclusion = collectLtcatRetirementConclusion(lines);
-        return risk;
-      }
-
-      function normalizeLtcatRiskLines(rawText = "") {
-        return String(rawText || "")
-          .replace(/\r\n?/g, "\n")
-          .split("\n")
-          .map(line => line.replace(/\u00a0/g, " ").trim())
-          .filter(line => line && line !== ".");
-      }
-
-      function isLtcatStandaloneLabel(line = "", label = "") {
-        return normalizeLtcatSearchText(line).replace(/:$/, "") === normalizeLtcatSearchText(label);
-      }
-
-      function findLtcatStandaloneLabelIndex(lines, label, startIndex = 0) {
-        for (let index = startIndex; index < lines.length; index += 1) {
-          if (isLtcatStandaloneLabel(lines[index], label)) return index;
-        }
-        return -1;
-      }
-
-      function findLtcatValueAfterLabel(lines, label) {
-        const index = findLtcatStandaloneLabelIndex(lines, label);
-        return index >= 0 ? (lines[index + 1] || "").trim() : "";
-      }
-
-      function findLtcatLineIndex(lines, matcher) {
-        if (typeof matcher === "function") return lines.findIndex(line => matcher(line));
-        return lines.findIndex(line => matcher.test(line));
-      }
-
-      function collectLtcatField(lines, label, stopLabels = []) {
-        const labelNorm = normalizeLtcatSearchText(label);
-        const start = lines.findIndex(line => normalizeLtcatSearchText(line).startsWith(labelNorm));
-        if (start < 0) return "";
-        const firstLine = normalizeLtcatSearchText(lines[start]) === labelNorm ? "" : repairLtcatMojibake(lines[start]).replace(new RegExp(`^${escapeRegExp(repairLtcatMojibake(label))}\\s*`, "i"), "").trim();
-        const output = firstLine ? [firstLine] : [];
-        for (let index = start + 1; index < lines.length; index += 1) {
-          if (stopLabels.some(stop => normalizeLtcatSearchText(lines[index]).startsWith(normalizeLtcatSearchText(stop)))) break;
-          output.push(lines[index]);
-        }
-        return output.join("\n").trim();
-      }
-
-      function collectLtcatStandaloneValue(lines, label, stopLabels = []) {
-        const start = findLtcatStandaloneLabelIndex(lines, label);
-        if (start < 0) return "";
-        const output = [];
-        for (let index = start + 1; index < lines.length; index += 1) {
-          if (stopLabels.some(stop => normalizeLtcatSearchText(lines[index]).startsWith(normalizeLtcatSearchText(stop)))) break;
-          output.push(lines[index]);
-        }
-        return output.join("\n").trim();
-      }
-
-      function collectLtcatAfterStandalone(lines, label, stopLabels = []) {
-        return collectLtcatStandaloneValue(lines, label, stopLabels);
-      }
-
-      function collectLtcatRetirementConclusion(lines) {
-        const start = findLtcatLineIndex(lines, line => normalizeLtcatSearchText(line).startsWith("conclusao da aposentadoria especial"));
-        const result = { physical: "", chemical: "", biological: "", unspecified: "" };
-        if (start < 0) return result;
-        const map = [
-          ["Agente físico", "physical"],
-          ["Agente químico", "chemical"],
-          ["Agente biológico", "biological"],
-          ["Agente inespecífico", "unspecified"]
-        ];
-        map.forEach(([label, key], index) => {
-          const labelIndex = findLtcatLineIndex(lines.slice(start), line => normalizeLtcatSearchText(line) === normalizeLtcatSearchText(label));
-          if (labelIndex < 0) return;
-          const absolute = start + labelIndex;
-          const nextLabel = map[index + 1]?.[0] || "";
-          const values = [];
-          for (let cursor = absolute + 1; cursor < lines.length; cursor += 1) {
-            if (nextLabel && normalizeLtcatSearchText(lines[cursor]) === normalizeLtcatSearchText(nextLabel)) break;
-            values.push(lines[cursor]);
-          }
-          result[key] = values.join("\n").trim();
-        });
-        return result;
-      }
-
-      function escapeRegExp(value = "") {
-        return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      }
-
       function extractCurrentDocumentAutomationProject() {
         const project = getActiveDocumentAutomationProject();
         const file = project.sourceFiles?.socFile;
@@ -5104,31 +4965,15 @@
         }
         const text = parseSocRtfToText(file.text);
         const extracted = extractLtcatDataFromSocText(text);
-        const currentBlocks = project.extractedData?.riskSectorBlocks || [];
-        if (currentBlocks.length) {
-          extracted.rawRiskSection = project.extractedData.rawRiskSection || "";
-          extracted.riskSectorBlocks = currentBlocks;
-          extracted.synthesisRawText = project.extractedData.synthesisRawText || "";
-          extracted.riskExtractionWarnings = project.extractedData.riskExtractionWarnings || [];
-          extracted.extractionDebug = project.extractedData.extractionDebug || {};
-          extracted.rawRiskWarning = "Os blocos de riscos editados manualmente foram preservados. Use Extrair riscos novamente para substituir.";
-        } else {
-          const rawRiskResult = extractLtcatSocRiskCore(text);
-          Object.assign(extracted, rawRiskResult.companyData || {});
-          extracted.rawRiskSection = rawRiskResult.rawRiskCore || "";
-          extracted.riskSectorBlocks = rawRiskResult.sectors || [];
-          extracted.synthesisRawText = "";
-          extracted.rawRiskWarning = rawRiskResult.error || rawRiskResult.warnings.join(" ");
-          extracted.riskExtractionWarnings = rawRiskResult.warnings || [];
-          extracted.extractionDebug = rawRiskResult.debug || {};
-          const currentHierarchy = extracted.hierarchy || {};
-          extracted.hierarchy = {
-            ...currentHierarchy,
-            sectors: uniqueStrings([...(currentHierarchy.sectors || []), ...rawRiskResult.sectors.map(block => block.title).filter(Boolean)]),
-            roles: uniqueStrings([...(currentHierarchy.roles || []), ...extractLtcatCargoNamesFromRiskCore(rawRiskResult.rawRiskCore || "")]),
-            rows: currentHierarchy.rows || []
-          };
-        }
+        extracted.rawRiskSection = project.extractedData?.rawRiskSection || "";
+        extracted.riskSectorBlocks = project.extractedData?.riskSectorBlocks || [];
+        extracted.synthesisRawText = project.extractedData?.synthesisRawText || "";
+        extracted.riskExtractionWarnings = [];
+        extracted.extractionDebug = {
+          ...(project.extractedData?.extractionDebug || {}),
+          riskPasteMode: "Os riscos formatados não são extraídos automaticamente. Cole o conteúdo rico na etapa de revisão."
+        };
+        extracted.rawRiskWarning = "";
         project.extractedData = extracted;
         project.companyName = extracted.companyName || project.companyName;
         project.unitName = extracted.unitName || project.unitName;
@@ -5321,11 +5166,9 @@
           confidence[field] = data[field] ? "high" : "missing";
           if (!data[field]) warnings.push(`${label}. O documento será gerado mesmo assim.`);
         });
-        if (!data.riskSectorBlocks || !data.riskSectorBlocks.length) missing.push("Nenhum bloco iniciado por SETOR foi extraído do SOC");
+        if (!hasLtcatRiskPasteContent(project.ltcatRiskPaste || {})) missing.push("Cole o conteúdo dos riscos do SOC antes de gerar o LTCAT");
         if (data.rawRiskWarning) warnings.push(data.rawRiskWarning);
         if (!data.hierarchy?.sectors?.length) warnings.push("Nenhum setor encontrado");
-        if (!project.sourceFiles?.companyLogo) warnings.push("Logo da empresa não enviada");
-        if (!project.sourceFiles?.previousDocumentFile) warnings.push("Documento anterior não enviado");
         if (!project.manualFields?.revisionHistory?.length) warnings.push("Histórico de revisão vazio");
         project.validation = { missingFields: missing, warnings, confidence };
         return project.validation;
@@ -5470,6 +5313,16 @@
             debug: project.extractedData?.extractionDebug || {},
             warnings: project.extractedData?.riskExtractionWarnings || []
           },
+          ltcatRiskPaste: {
+            sourceType: project.ltcatRiskPaste?.sourceType || "",
+            updatedAt: project.ltcatRiskPaste?.updatedAt || "",
+            hasRtf: Boolean(project.ltcatRiskPaste?.rtf),
+            hasHtml: Boolean(project.ltcatRiskPaste?.html),
+            hasText: Boolean(project.ltcatRiskPaste?.text),
+            rtf: project.ltcatRiskPaste?.rtf || "",
+            html: project.ltcatRiskPaste?.html || "",
+            text: project.ltcatRiskPaste?.text || ""
+          },
           extractedData: project.extractedData,
           manualFields: project.manualFields,
           validation: project.validation,
@@ -5494,11 +5347,11 @@
         if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
         const normalized = normalizeDocumentAutomationProject(project);
         updateDocumentAutomationValidation(normalized);
-        if (!normalized.extractedData?.riskSectorBlocks?.length) {
+        if (!hasLtcatRiskPasteContent(normalized.ltcatRiskPaste || {})) {
           documentAutomationDraft = normalized;
           activeDocumentAutomationStep = "review";
           renderDocumentAutomation();
-          return showToast("Não foi possível gerar o Word: extraia primeiro o bloco real de SETOR do SOC.", "warning", 5200);
+          return showToast("Cole o conteúdo dos riscos do SOC antes de gerar o LTCAT.", "warning", 5200);
         }
         let blob;
         let fileName;
@@ -5543,7 +5396,9 @@
         const entries = await readDocxZipEntries(templateBuffer);
         const documentEntry = entries.get("word/document.xml");
         if (!documentEntry) throw new Error("O modelo padrão de LTCAT não possui word/document.xml.");
-        documentEntry.data = encodeUtf8(patchLtcatDocumentXml(decodeUtf8(documentEntry.data), project));
+        const riskChunk = prepareLtcatRiskAltChunk(project);
+        ensureLtcatAltChunkPackageParts(entries, riskChunk);
+        documentEntry.data = encodeUtf8(patchLtcatDocumentXml(decodeUtf8(documentEntry.data), project, riskChunk.relId));
         for (const [name, entry] of entries) {
           if (/^word\/(?:header|footer)\d*\.xml$/i.test(name)) {
             entry.data = encodeUtf8(patchLtcatTextPlaceholdersInXml(decodeUtf8(entry.data), project));
@@ -5552,7 +5407,93 @@
         return buildStoredZipBlob(Array.from(entries.values()));
       }
 
-      function patchLtcatDocumentXml(documentXml, project) {
+      function prepareLtcatRiskAltChunk(project) {
+        const paste = normalizeLtcatRiskPaste(project.ltcatRiskPaste || {});
+        if (paste.rtf) {
+          return {
+            relId: "rIdLtcatRiskContent",
+            name: "word/ltcat-risk-content.rtf",
+            target: "ltcat-risk-content.rtf",
+            contentType: "application/rtf",
+            data: encodeUtf8(paste.rtf),
+            sourceType: "rtf"
+          };
+        }
+        const html = paste.html || (paste.text ? plainToRich(paste.text) : "");
+        if (!html) throw new Error("Cole o conteúdo dos riscos do SOC antes de gerar o LTCAT.");
+        return {
+          relId: "rIdLtcatRiskContent",
+          name: "word/ltcat-risk-content.html",
+          target: "ltcat-risk-content.html",
+          contentType: "text/html",
+          data: encodeUtf8(buildLtcatAltChunkHtml(html)),
+          sourceType: paste.html ? "html" : "text"
+        };
+      }
+
+      function buildLtcatAltChunkHtml(contentHtml = "") {
+        const safe = sanitizeLtcatPastedHtml(contentHtml);
+        return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
+table { border-collapse: collapse; width: 100%; }
+td, th { vertical-align: top; }
+p { margin: 0 0 6pt; }
+</style>
+</head>
+<body>${safe}</body>
+</html>`;
+      }
+
+      function ensureLtcatAltChunkPackageParts(entries, riskChunk) {
+        entries.set(riskChunk.name, { name: riskChunk.name, data: riskChunk.data });
+        patchLtcatDocumentRelationships(entries, riskChunk);
+        patchLtcatContentTypes(entries, riskChunk);
+      }
+
+      function patchLtcatDocumentRelationships(entries, riskChunk) {
+        const relsName = "word/_rels/document.xml.rels";
+        const relsEntry = entries.get(relsName);
+        const parser = new DOMParser();
+        const xmlDoc = relsEntry
+          ? parser.parseFromString(decodeUtf8(relsEntry.data), "application/xml")
+          : parser.parseFromString('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>', "application/xml");
+        if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível atualizar os relacionamentos do DOCX.");
+        const root = xmlDoc.documentElement;
+        Array.from(root.getElementsByTagNameNS("http://schemas.openxmlformats.org/package/2006/relationships", "Relationship"))
+          .filter(node => node.getAttribute("Id") === riskChunk.relId || node.getAttribute("Target") === riskChunk.target)
+          .forEach(node => root.removeChild(node));
+        const relationship = xmlDoc.createElementNS("http://schemas.openxmlformats.org/package/2006/relationships", "Relationship");
+        relationship.setAttribute("Id", riskChunk.relId);
+        relationship.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk");
+        relationship.setAttribute("Target", riskChunk.target);
+        root.appendChild(relationship);
+        entries.set(relsName, { name: relsName, data: encodeUtf8(new XMLSerializer().serializeToString(xmlDoc)) });
+      }
+
+      function patchLtcatContentTypes(entries, riskChunk) {
+        const contentTypesName = "[Content_Types].xml";
+        const entry = entries.get(contentTypesName);
+        if (!entry) throw new Error("O modelo padrão não possui [Content_Types].xml.");
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(decodeUtf8(entry.data), "application/xml");
+        if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível atualizar os tipos de conteúdo do DOCX.");
+        const root = xmlDoc.documentElement;
+        const partName = `/${riskChunk.name}`;
+        Array.from(root.getElementsByTagNameNS("http://schemas.openxmlformats.org/package/2006/content-types", "Override"))
+          .filter(node => node.getAttribute("PartName") === partName)
+          .forEach(node => root.removeChild(node));
+        const override = xmlDoc.createElementNS("http://schemas.openxmlformats.org/package/2006/content-types", "Override");
+        override.setAttribute("PartName", partName);
+        override.setAttribute("ContentType", riskChunk.contentType);
+        root.appendChild(override);
+        entry.data = encodeUtf8(new XMLSerializer().serializeToString(xmlDoc));
+      }
+
+      function patchLtcatDocumentXml(documentXml, project, riskChunkRelId = "rIdLtcatRiskContent") {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(documentXml, "application/xml");
         if (xmlDoc.getElementsByTagName("parsererror").length) throw new Error("Não foi possível ler o XML do modelo padrão de LTCAT.");
@@ -5560,11 +5501,12 @@
         insertLtcatIdentificationAndHierarchy(xmlDoc, project);
         const markerParagraph = findLtcatMarkerParagraph(xmlDoc);
         if (!markerParagraph) throw new Error(`Marcador "${DEFAULT_LTCAT_TEMPLATE_MARKER}" não encontrado no modelo padrão de LTCAT.`);
-        const parent = markerParagraph.parentNode;
-        const templatePPr = getFirstChildByLocalName(markerParagraph, "pPr");
-        renderStructuredLtcatRiskContent(xmlDoc, extractStructuredLtcatRiskBlocks(project).sectors, templatePPr)
-          .forEach(node => parent.insertBefore(node, markerParagraph));
-        parent.removeChild(markerParagraph);
+        const body = getDocxBody(xmlDoc);
+        if (!body || markerParagraph.parentNode !== body) throw new Error("Marcador de riscos encontrado fora do corpo principal do DOCX.");
+        const altChunk = xmlDoc.createElementNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "w:altChunk");
+        altChunk.setAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "r:id", riskChunkRelId);
+        body.insertBefore(altChunk, markerParagraph);
+        body.removeChild(markerParagraph);
         return new XMLSerializer().serializeToString(xmlDoc);
       }
 
@@ -5577,19 +5519,6 @@
         return Array.from(paragraph.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"))
           .map(node => node.textContent || "")
           .join("");
-      }
-
-      function buildLtcatRiskParagraphs(xmlDoc, blocks, templatePPr) {
-        const paragraphs = [];
-        (blocks || []).forEach((block, blockIndex) => {
-          const lines = String(block.rawText || `SETOR\n${block.title || `Setor ${blockIndex + 1}`}`)
-            .replace(/\r\n?/g, "\n")
-            .split("\n");
-          lines.forEach((line, lineIndex) => {
-            paragraphs.push(createDocxParagraph(xmlDoc, line, { pageBreak: lineIndex === 0, templatePPr }));
-          });
-        });
-        return paragraphs.length ? paragraphs : [createDocxParagraph(xmlDoc, "", { pageBreak: true, templatePPr })];
       }
 
       function createDocxParagraph(xmlDoc, text, options = {}) {
@@ -5738,93 +5667,6 @@
           nodes.push(createDocxTable(xmlDoc, [["Setor", "Cargo", "FuncionÃ¡rios"], ...hierarchyRows.map(row => [row.sector, row.role, row.employees])], { header: true }));
         }
         return nodes;
-      }
-
-      function renderStructuredLtcatRiskContent(xmlDoc, sectors, templatePPr) {
-        const nodes = [];
-        (sectors || []).forEach((sector, sectorIndex) => {
-          nodes.push(createDocxParagraph(xmlDoc, "SETOR", { pageBreak: true, bold: true, fontSize: 24, align: "center" }));
-          nodes.push(createDocxParagraph(xmlDoc, sector.name || `Setor ${sectorIndex + 1}`, { bold: true, fontSize: 24, align: "center", spacingAfter: 180 }));
-          if (sector.summary) nodes.push(createDocxTable(xmlDoc, [["DescriÃ§Ã£o do setor", sector.summary]], { labelWidth: 1900 }));
-          if (!sector.roles?.length && sector.rawText) {
-            nodes.push(createDocxParagraph(xmlDoc, "ConteÃºdo tÃ©cnico extraÃ­do", { bold: true, fontSize: 22, spacingAfter: 120 }));
-            nodes.push(...createDocxParagraphsFromText(xmlDoc, sector.rawText, { templatePPr }));
-          }
-          (sector.roles || []).forEach((role, roleIndex) => {
-            nodes.push(createDocxParagraph(xmlDoc, roleIndex === 0 ? "CARGO" : "CARGO", { bold: true, fontSize: 22, spacingAfter: 80 }));
-            nodes.push(createDocxParagraph(xmlDoc, role.name || `Cargo ${roleIndex + 1}`, { bold: true, fontSize: 22, spacingAfter: 120 }));
-            const roleRows = [];
-            if (role.roleDescription) roleRows.push(["DescriÃ§Ã£o do cargo", role.roleDescription]);
-            if (role.gfip) roleRows.push(["GFIP", role.gfip]);
-            if (roleRows.length) nodes.push(createDocxTable(xmlDoc, roleRows, { labelWidth: 1900 }));
-            if (!role.riskBlocks?.length && role.rawText) nodes.push(...createDocxParagraphsFromText(xmlDoc, role.rawText, { templatePPr }));
-            (role.riskBlocks || []).forEach((risk, riskIndex) => {
-              nodes.push(createDocxParagraph(xmlDoc, risk.title || `EspecificaÃ§Ã£o dos perigos/fatores de risco - Cargo ${role.name || roleIndex + 1}`, { bold: true, fontSize: 22, color: "1F3763", spacingAfter: 120 }));
-              nodes.push(createDocxTable(xmlDoc, [["IdentificaÃ§Ã£o"]], { fullHeader: true }));
-              nodes.push(createDocxTable(xmlDoc, [
-                ["Grupo", "CÃ³digo eSocial", "Perigo/Fator de Risco"],
-                [risk.group, risk.esocialCode, risk.hazard]
-              ], { header: true }));
-              const details = [
-                ["DescriÃ§Ã£o", risk.description],
-                ["FundamentaÃ§Ã£o legal", risk.legalBasis],
-                ["PossÃ­veis lesÃµes ou agravos Ã  saÃºde", risk.healthDamage],
-                ["Fontes ou circunstÃ¢ncias", risk.sources],
-                ["Meio de PropagaÃ§Ã£o", risk.propagation]
-              ].filter(([, value]) => String(value || "").trim());
-              if (details.length) nodes.push(createDocxTable(xmlDoc, details, { labelWidth: 2300 }));
-              nodes.push(createDocxTable(xmlDoc, [["AvaliaÃ§Ã£o"]], { fullHeader: true }));
-              const evaluationRows = [
-                ["CritÃ©rio", risk.criterion],
-                ["Perfil de exposiÃ§Ã£o", risk.exposureProfile]
-              ].filter(([, value]) => String(value || "").trim());
-              if (evaluationRows.length) nodes.push(createDocxTable(xmlDoc, evaluationRows, { labelWidth: 1900 }));
-              if (risk.probability || risk.severity || risk.riskLevel) {
-                nodes.push(createDocxTable(xmlDoc, [
-                  ["Probabilidade", "Gravidade", "NÃ­vel de risco"],
-                  [risk.probability, risk.severity, risk.riskLevel]
-                ], { header: true }));
-              }
-              const measurement = risk.measurement || {};
-              if (Object.values(measurement).some(Boolean)) {
-                nodes.push(createDocxTable(xmlDoc, [["MediÃ§Ã£o"]], { fullHeader: true }));
-                nodes.push(createDocxTable(xmlDoc, [
-                  ["Empresa", "TÃ©cnica utilizada", "Equipamento"],
-                  [measurement.company, measurement.technique, measurement.equipment],
-                  ["Data da mediÃ§Ã£o", "MediÃ§Ã£o", "NÃ­vel de aÃ§Ã£o", "LT"],
-                  [measurement.measurementDate, measurement.measurementValue, measurement.actionLevel, measurement.lt]
-                ], { headerRows: [0, 2] }));
-              }
-              if (risk.preventionAndControl) {
-                nodes.push(createDocxTable(xmlDoc, [["PrevenÃ§Ã£o e controle"]], { fullHeader: true }));
-                nodes.push(createDocxTable(xmlDoc, [["AÃ§Ãµes necessÃ¡rias", risk.preventionAndControl]], { labelWidth: 1900 }));
-              }
-              if (risk.technicalOpinion) {
-                nodes.push(createDocxTable(xmlDoc, [["Parecer TÃ©cnico"]], { fullHeader: true }));
-                nodes.push(createDocxTable(xmlDoc, [[risk.technicalOpinion]], {}));
-              }
-              const conclusion = risk.retirementConclusion || {};
-              if (Object.values(conclusion).some(Boolean)) {
-                nodes.push(createDocxTable(xmlDoc, [["ConclusÃ£o da Aposentadoria Especial"]], { fullHeader: true }));
-                nodes.push(createDocxTable(xmlDoc, [
-                  ["Agente fÃ­sico", conclusion.physical],
-                  ["Agente quÃ­mico", conclusion.chemical],
-                  ["Agente biolÃ³gico", conclusion.biological],
-                  ["Agente inespecÃ­fico", conclusion.unspecified]
-                ], { labelWidth: 2100 }));
-              }
-              if (riskIndex < (role.riskBlocks || []).length - 1) nodes.push(createDocxParagraph(xmlDoc, "", { spacingAfter: 120 }));
-            });
-          });
-        });
-        return nodes.length ? nodes : [createDocxParagraph(xmlDoc, "", { pageBreak: true, templatePPr })];
-      }
-
-      function createDocxParagraphsFromText(xmlDoc, text, options = {}) {
-        return String(text || "")
-          .replace(/\r\n?/g, "\n")
-          .split("\n")
-          .map(line => createDocxParagraph(xmlDoc, line, options));
       }
 
       function createDocxTable(xmlDoc, rows, options = {}) {

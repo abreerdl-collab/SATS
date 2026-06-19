@@ -1,1 +1,56 @@
-/* Módulo 4 - Automação de Documentos: estilos específicos serão migrados gradualmente do base.css. */
+/* Modulo 4 - Automacao de Documentos */
+
+.ltcat-rich-paste-area,
+.ltcat-rich-paste-preview {
+  width: 100%;
+  min-height: 280px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 16px;
+  overflow: auto;
+  line-height: 1.45;
+}
+
+.ltcat-rich-paste-area {
+  outline: none;
+}
+
+.ltcat-rich-paste-area:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.ltcat-rich-paste-area:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.ltcat-rich-paste-area table,
+.ltcat-rich-paste-preview table {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.ltcat-rich-paste-area td,
+.ltcat-rich-paste-area th,
+.ltcat-rich-paste-preview td,
+.ltcat-rich-paste-preview th {
+  border: 1px solid currentColor;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.ltcat-rich-paste-area p,
+.ltcat-rich-paste-preview p {
+  margin-top: 0;
+}
+
+html[data-theme="dark"] .ltcat-rich-paste-area,
+html[data-theme="dark"] .ltcat-rich-paste-preview {
+  background: var(--surface-soft);
+  border-color: var(--line-strong);
+}
