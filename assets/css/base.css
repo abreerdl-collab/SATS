@@ -4727,17 +4727,13 @@
       #section-equipment tbody td:nth-child(1)::before { content: "Item"; }
       #section-equipment tbody td:nth-child(2)::before { content: "Descricao"; }
       #section-equipment tbody td:nth-child(3)::before { content: "Responsavel"; }
-      #section-equipment tbody td:nth-child(4)::before { content: "Status"; }
-      #section-equipment tbody td:nth-child(5)::before { content: "Observacao"; }
-      #section-equipment tbody td:nth-child(6)::before { content: "Opcoes"; }
+      #section-equipment tbody td:nth-child(4)::before { content: "Opcoes"; }
 
       #section-trainings tbody td:nth-child(1)::before { content: "Item"; }
       #section-trainings tbody td:nth-child(2)::before { content: "Treinamento"; }
       #section-trainings tbody td:nth-child(3)::before { content: "Responsavel"; }
       #section-trainings tbody td:nth-child(4)::before { content: "Quando"; }
-      #section-trainings tbody td:nth-child(5)::before { content: "Status"; }
-      #section-trainings tbody td:nth-child(6)::before { content: "Observacao"; }
-      #section-trainings tbody td:nth-child(7)::before { content: "Opcoes"; }
+      #section-trainings tbody td:nth-child(5)::before { content: "Opcoes"; }
 
       tbody td.empty-row::before {
         display: none;

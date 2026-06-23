@@ -11613,7 +11613,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         tbody.innerHTML = "";
         const filteredRows = rows.filter(row => matchesFilters(row, section));
         if (!filteredRows.length) {
-          const colspan = section === "actions" ? 8 : section === "equipment" ? 6 : 7;
+          const colspan = section === "actions" ? 8 : section === "equipment" ? 4 : 5;
           tbody.innerHTML = `<tr><td class="empty-row" colspan="${colspan}">Nenhum registro encontrado com os filtros atuais.</td></tr>`;
           return;
         }
@@ -11673,8 +11673,6 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           <td>${itemCellHtml(row, index, false, "equipment")}</td>
           <td>${richEditorHtml("descriptionHtml", row.descriptionHtml, "Descreva o equipamento. Cole imagens aqui.")}</td>
           <td><input class="table-input" data-field="responsible" list="responsibleSuggestions" value="${escapeAttr(row.responsible)}" ${isRestrictedAdminUser() ? "readonly" : ""}></td>
-          <td>${selectHtml("status", row.status, STATUSES, "status-select " + statusClass(row.status))}</td>
-          <td>${richEditorHtml("observationHtml", row.observationHtml, "Observações e imagens.")}</td>
           <td class="no-print">${rowActionButtons(row)}</td>
         `;
       }
@@ -11685,8 +11683,6 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           <td>${richEditorHtml("trainingHtml", row.trainingHtml, "Descreva o treinamento. Cole imagens aqui.")}</td>
           <td><input class="table-input" data-field="responsible" list="responsibleSuggestions" value="${escapeAttr(row.responsible)}" ${isRestrictedAdminUser() ? "readonly" : ""}></td>
           <td>${whenCellHtml(row.when)}</td>
-          <td>${selectHtml("status", row.status, STATUSES, "status-select " + statusClass(row.status))}</td>
-          <td>${richEditorHtml("observationHtml", row.observationHtml, "Observações e imagens.")}</td>
           <td class="no-print">${rowActionButtons(row)}</td>
         `;
       }
@@ -13057,32 +13053,21 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       async function buildExecutiveWord(plan) {
         const data = plan.data || { meta: {}, actions: [], equipment: [], trainings: [] };
         const meta = data.meta || {};
-        const stats = getExecutiveStats(plan);
         const company = meta.company || plan.company || "-";
-        const documentName = meta.documentName || plan.documentType || "-";
         const logo = /^data:image\/(png|jpe?g)/i.test(meta.companyLogoImage || "")
           ? `<img class="word-company-logo" src="${escapeAttr(meta.companyLogoImage)}" alt="Logo da empresa">`
           : "";
-        const summaryRows = [[
-          String(stats.total),
-          `${stats.notStarted} (${pct(stats.notStarted, stats.total)})`,
-          `${stats.inProgress} (${pct(stats.inProgress, stats.total)})`,
-          `${stats.done} (${pct(stats.done, stats.total)})`,
-          `${stats.progress}%`,
-          String(stats.highOpen)
-        ]];
         const actionRows = (data.actions || []).map((row, index) => [
           String(index + 1), wordRichHtml(row.actionHtml), wordPlainHtml(row.responsible),
-          wordPlainHtml(row.when), wordToneHtml(row.priority, "priority"),
-          wordToneHtml(row.status, "status"), wordRichHtml(row.observationHtml)
+          wordPlainHtml(row.when), wordToneCell(row.priority, "priority"),
+          wordToneCell(row.status, "status"), wordRichHtml(row.observationHtml)
         ]);
         const equipmentRows = (data.equipment || []).map((row, index) => [
-          String(index + 1), wordRichHtml(row.descriptionHtml), wordPlainHtml(row.responsible),
-          wordToneHtml(row.status, "status"), wordRichHtml(row.observationHtml)
+          String(index + 1), wordRichHtml(row.descriptionHtml), wordPlainHtml(row.responsible)
         ]);
         const trainingRows = (data.trainings || []).map((row, index) => [
           String(index + 1), wordRichHtml(row.trainingHtml), wordPlainHtml(row.responsible),
-          wordPlainHtml(row.when), wordToneHtml(row.status, "status"), wordRichHtml(row.observationHtml)
+          wordPlainHtml(row.when)
         ]);
 
         return `<!DOCTYPE html>
@@ -13099,25 +13084,27 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
     th { background: #1d4ed8; color: #fff; text-align: left; font-weight: 700; }
     tr:nth-child(even) td { background: #f8fafc; }
     h1 { margin: 0; font-size: 20pt; color: #0f172a; text-align: center; }
-    h2 { margin: 18px 0 7px; padding-bottom: 4px; border-bottom: 2px solid #2563eb; font-size: 13pt; }
+    h2 { margin: 0 0 7px; padding-bottom: 4px; border-bottom: 2px solid #2563eb; font-size: 13pt; }
+    h2:not(:first-child) { margin-top: 18px; }
     p { margin: 0 0 6px; }
     img { max-width: 240px; height: auto; }
+    .word-header { margin-bottom: 16px; }
     .word-header, .word-header td { border: 0; background: #fff !important; vertical-align: middle; }
     .word-header-left { width: 22%; text-align: left; }
     .word-header-center { width: 56%; text-align: center; }
     .word-header-right { width: 22%; text-align: right; font-size: 8pt; color: #475569; }
     .word-company-logo { display: block; max-width: 120px; max-height: 62px; width: auto; height: auto; margin: 0; }
     .word-subtitle { margin-top: 4px; color: #475569; font-size: 10pt; }
-    .word-meta th { width: 16%; }
-    .word-description { border: 1px solid #cbd5e1; padding: 8px; margin-bottom: 12px; }
     .word-table td:first-child, .word-table th:first-child { text-align: center; width: 34px; }
     .word-table img { max-width: 180px; max-height: 100px; }
-    .word-tone { display: inline-block; padding: 2px 5px; font-weight: 700; }
-    .tone-high, .tone-cancelled { background: #fee2e2; color: #991b1b; }
-    .tone-medium { background: #fef3c7; color: #92400e; }
-    .tone-low, .tone-done { background: #dcfce7; color: #166534; }
-    .tone-progress { background: #dbeafe; color: #1d4ed8; }
-    .tone-pending { background: #e5e7eb; color: #374151; }
+    .word-tone-cell { font-weight: 700; text-align: center; }
+    .tone-priority-high { background: #dc2626 !important; color: #ffffff; }
+    .tone-priority-medium { background: #facc15 !important; color: #713f12; }
+    .tone-priority-low { background: #16a34a !important; color: #ffffff; }
+    .tone-status-pending { background: #e5e7eb !important; color: #374151; }
+    .tone-status-progress { background: #2563eb !important; color: #ffffff; }
+    .tone-status-done { background: #16a34a !important; color: #ffffff; }
+    .tone-status-cancelled { background: #dc2626 !important; color: #ffffff; }
     .word-footer { margin-top: 18px; border-top: 1px solid #cbd5e1; padding-top: 6px; color: #64748b; font-size: 8pt; text-align: center; }
   </style>
 </head>
@@ -13128,12 +13115,9 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
     <td class="word-header-center"><h1>CRONOGRAMA DE AÇÕES SST</h1><div class="word-subtitle">${escapeHtml(plan.title || "Plano de ação")}${company !== "-" ? ` - ${escapeHtml(company)}` : ""}</div></td>
     <td class="word-header-right"><strong>Revisão</strong><br>${escapeHtml(meta.revisionDate || "-")}<br><strong>Atualizado</strong><br>${escapeHtml(formatDateTime(plan.updatedAt))}</td>
   </tr></table>
-  ${wordTable("", ["Empresa", "Documento", "Responsável técnico / setor", "Criação / revisão"], [[wordPlainHtml(company), wordPlainHtml(documentName), wordPlainHtml(meta.technicalOwner || "-"), wordPlainHtml(meta.revisionDate || "-")]], "word-meta")}
-  <h2>Descrição</h2><div class="word-description">${wordRichHtml(meta.description || DEFAULT_DESCRIPTION)}</div>
-  <h2>Resumo</h2>${wordTable("", ["Total de ações", "Não iniciadas", "Em andamento", "Concluídas", "Progresso geral", "Alta prioridade aberta"], summaryRows)}
   ${wordTable("Ações", ["Item", "Ação recomendada", "Responsável", "Quando", "Prioridade", "Status", "Observação"], actionRows)}
-  ${wordTable("Equipamentos de emergência", ["Item", "Descrição", "Responsável", "Status", "Observação"], equipmentRows)}
-  ${wordTable("Treinamentos", ["Item", "Treinamento", "Responsável", "Quando", "Status", "Observação"], trainingRows)}
+  ${wordTable("Equipamentos de emergência", ["Item", "Descrição", "Responsável"], equipmentRows)}
+  ${wordTable("Treinamentos", ["Item", "Treinamento", "Responsável", "Quando"], trainingRows)}
   <div class="word-footer">SATS - Plano de Ação | Última edição: ${escapeHtml(formatDateTime(plan.updatedAt))}</div>
 </div>
 </body>
@@ -13145,8 +13129,19 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         if (!rows.length) return `${heading}<p>Nenhum registro cadastrado.</p>`;
         return `${heading}<table class="word-table ${extraClass}">
           <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
-          <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell == null || cell === "" ? "-" : cell}</td>`).join("")}</tr>`).join("")}</tbody>
+          <tbody>${rows.map(row => `<tr>${row.map(wordCellHtml).join("")}</tr>`).join("")}</tbody>
         </table>`;
+      }
+
+      function wordCellHtml(cell) {
+        if (cell && typeof cell === "object" && Object.prototype.hasOwnProperty.call(cell, "html")) {
+          const attrs = [];
+          if (cell.className) attrs.push(`class="${escapeAttr(cell.className)}"`);
+          if (cell.bgcolor) attrs.push(`bgcolor="${escapeAttr(cell.bgcolor)}"`);
+          if (cell.style) attrs.push(`style="${escapeAttr(cell.style)}"`);
+          return `<td${attrs.length ? " " + attrs.join(" ") : ""}>${cell.html == null || cell.html === "" ? "-" : cell.html}</td>`;
+        }
+        return `<td>${cell == null || cell === "" ? "-" : cell}</td>`;
       }
 
       function wordPlainHtml(value) {
@@ -13159,21 +13154,41 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         return sanitizeRichHtml(raw) || "-";
       }
 
-      function wordToneHtml(value, type) {
+      function wordToneCell(value, type) {
         const text = String(value || "-");
         const normalized = normalizeText(text);
         let tone = "";
+        let color = "";
         if (type === "priority") {
-          if (normalized === "alta") tone = "tone-high";
-          else if (normalized === "media") tone = "tone-medium";
-          else if (normalized === "baixa") tone = "tone-low";
+          if (normalized === "alta") {
+            tone = "tone-priority-high";
+            color = "#ff3333";
+          } else if (normalized === "media") {
+            tone = "tone-priority-medium";
+            color = "#ffc928";
+          } else if (normalized === "baixa") {
+            tone = "tone-priority-low";
+            color = "#16d416";
+          }
         } else {
-          if (normalized === "concluido") tone = "tone-done";
-          else if (normalized === "em andamento") tone = "tone-progress";
-          else if (normalized === "cancelado") tone = "tone-cancelled";
-          else tone = "tone-pending";
+          if (normalized === "concluido") {
+            tone = "tone-status-done";
+            color = "#16d416";
+          } else if (normalized === "em andamento") {
+            tone = "tone-status-progress";
+            color = "#9fb7d9";
+          } else if (normalized === "cancelado") {
+            tone = "tone-status-cancelled";
+            color = "#ff3333";
+          } else {
+            tone = "tone-status-pending";
+            color = "#bfc6d1";
+          }
         }
-        return `<span class="word-tone ${tone}">${escapeHtml(text)}</span>`;
+        const style = color
+          ? `background-color:${color};color:#000000;font-weight:600;text-align:center;mso-pattern:auto none;`
+          : "font-weight:600;text-align:center;";
+        return { html: escapeHtml(text), className: `word-tone-cell ${tone}`, bgcolor: color, style };
       }
 
       function executiveWordFileName(plan) {
