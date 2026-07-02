@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desativar recuperacao STS</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, sans-serif;
+      background: #071426;
+      color: #eaf3ff;
+    }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    main {
+      width: min(520px, 100%);
+      border: 1px solid rgba(93, 160, 255, .35);
+      border-radius: 16px;
+      background: rgba(11, 26, 46, .92);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+      padding: 28px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 24px;
+    }
+    p {
+      color: #bcd3f2;
+      line-height: 1.5;
+    }
+    a {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Modo recuperacao desativado</h1>
+    <p>O STS removeu somente as travas locais de recuperacao. Seus dados salvos nao foram apagados.</p>
+    <p>Voce sera levado de volta para o sistema automaticamente.</p>
+    <a href="index.html">Voltar agora</a>
+  </main>
+  <script>
+    [
+      "sts.recoveryMode.v1",
+      "sts.recoveryReason.v1",
+      "sts.profileConflictReadOnly.v1"
+    ].forEach(function (key) {
+      localStorage.removeItem(key);
+    });
+    setTimeout(function () {
+      window.location.replace("index.html?recovery-off=" + Date.now());
+    }, 900);
+  </script>
+</body>
+</html>
