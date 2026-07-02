@@ -19,9 +19,21 @@
       const SYNC_LEADER_KEY = "planoDeAcaoSST.syncLeader.v1";
       const PRESENCE_STORAGE_KEY = "planoDeAcaoSST.presence.v1";
       const LOCAL_MIGRATION_KEY = "planoDeAcaoSST.localMerged.v1";
+      const RECOVERY_MODE_KEY = "sts.recoveryMode.v1";
+      const RECOVERY_REASON_KEY = "sts.recoveryReason.v1";
+      const PROFILE_CONFLICT_READONLY_KEY = "sts.profileConflictReadOnly.v1";
       const STORAGE_KEY = "planoDeAcaoSST.v2";
       const THEME_KEY = "planoDeAcaoSST.theme.v1";
       const THEME_USER_PREFIX = "planoDeAcaoSST.theme.user.";
+      const STS_BRAND = {
+        shortName: "STS",
+        fullName: "Suporte Técnico de Segurança",
+        title: "STS - Suporte Técnico de Segurança",
+        fullLogoLight: "assets/img/branding/sts-logo-full-ofc.png",
+        fullLogoDark: "assets/img/branding/sts-logo-full-ofc.png",
+        iconLight: "assets/img/branding/sts-logo-icon-ofc.png",
+        iconDark: "assets/img/branding/sts-logo-icon-ofc.png"
+      };
       const MAX_ACTIVITY_LOG = 500;
       const RESTRICTED_ATTEMPT_ACTION = "Tentativa de acesso restrito";
       const LOGGED_ACTIVITY_ACTIONS = new Set([
@@ -51,6 +63,12 @@
         "Criou projeto de automação", "Enviou arquivo SOC", "Extraiu dados do SOC",
         "Editou campos extraídos", "Gerou Word da automação", "Salvou projeto de automação",
         "Excluiu projeto de automação",
+        "Criou documento de texto", "Editou documento de texto", "Duplicou documento de texto", "Excluiu documento de texto",
+        "Criou checklist", "Duplicou checklist", "Excluiu checklist", "Gerou checklist da empresa", "Solicitou cópia", "Forneceu cópia", "Forneceu tudo",
+        "Alterou perfil no menu", "Alterou foto de perfil no menu",
+        "Ativou modo recuperacao", "Desativou modo recuperacao", "Importou backup de recuperacao", "Aplicou restauracao",
+        "Recusou estado remoto corrompido", "Supabase indisponivel", "Conflito de perfil detectado",
+        "Tentativa bloqueada de associar perfil errado",
         RESTRICTED_ATTEMPT_ACTION
       ]);
       const DEFAULT_FOLDER_ID = "default-folder";
@@ -88,6 +106,7 @@
       const RESTRICTED_ADMIN_EMAILS = new Set(["administrativo@protege.med.br"]);
       const IMPROVEMENTS_OWNER_EMAIL = "abner.l@outlook.com";
       const SUPER_ADMIN_EMAIL = "abner.l@outlook.com";
+      const LAYANNE_PROFILE_EMAIL = "segurancadotrabalho@protege.med.br";
       const DOCUMENT_AUTOMATION_OWNER_EMAIL = "abner.l@outlook.com";
       const DOCUMENT_AUTOMATION_MAX_FILE_BYTES = 10 * 1024 * 1024;
       const DEFAULT_LTCAT_TEMPLATE_URL = "assets/templates/ltcat-modelo-padrao.docx";
@@ -106,7 +125,7 @@
         "repairData", "exportFullSystem", "importFullSystem"
       ];
       const MANAGEMENT_PERMISSION_LABELS = {
-        accessManagement: "Acessar Gestão SATS",
+        accessManagement: "Acessar Gestão STS",
         phase1View: "Visualizar Fase 1",
         manageSuggestions: "Gerenciar sugestões",
         viewActivity: "Ver atividades",
@@ -147,6 +166,7 @@
       let supabaseClient = null;
       let currentUser = null;
       let cloudReady = false;
+      let profileConflictActive = false;
       let isHydrating = true;
       let hydrateUserPromise = null;
       let hydrateUserId = "";
@@ -202,6 +222,11 @@
       let richToolbarDragState = null;
       let selectedPortalApp = null;
       let portalRouteApplied = false;
+      let euTecnicoSearchTerm = "";
+      let euTecnicoSelectedProfileId = "";
+      let euTecnicoSelectedFolderId = "";
+      let crewSelectedRecipient = null;
+      let postLoginLoadingStartedAt = 0;
       let activeDocumentAutomationProjectId = "";
       let documentAutomationDraft = null;
       let activeDocumentAutomationStep = "type";
@@ -217,7 +242,7 @@
       let editingActionPlanTemplateId = "";
       let editingActionPlanTemplateDraft = null;
       // Chaves legadas continuam disponíveis apenas para manter rotinas antigas inofensivas.
-      const managementFilters = { profiles: "", folders: "", plans: "", planProfile: "", planFolder: "", templates: "", templateStatus: "all", suggestions: "", suggestionStatus: "all", activity: "", activityAction: "", activityUser: "", audit: "", auditAction: "", auditUser: "", clients: "", units: "", sectors: "", commercialClient: "" };
+      const managementFilters = { profiles: "", folders: "", documents: "", documentType: "all", documentStatus: "all", plans: "", planProfile: "", planFolder: "", checklists: "", textDocuments: "", copyRequests: "", copyRequestStatus: "all", trash: "", templates: "", templateStatus: "all", suggestions: "", suggestionStatus: "all", activity: "", activityAction: "", activityUser: "", audit: "", auditAction: "", auditUser: "", clients: "", units: "", sectors: "", commercialClient: "" };
       let selectedManagementLogIds = new Set();
       let managementPlanEditContext = null;
       let managementFilterRenderTimer = null;
@@ -227,7 +252,10 @@
       let activeManagementSuggestionView = "open";
       let pendingSuggestionAttachment = null;
       let activeSuggestionNotificationId = "";
+      let recoveryImportCandidate = null;
       const postponedSuggestionNotificationIds = new Set();
+
+      ensureMenuPrototypeDom();
 
       const els = {
         authScreen: document.getElementById("authScreen"),
@@ -238,6 +266,14 @@
         restrictedReadonlyBanner: document.getElementById("restrictedReadonlyBanner"),
         passwordMessage: document.getElementById("passwordMessage"),
         switchUserMessage: document.getElementById("switchUserMessage"),
+        satsLoadingScreen: document.getElementById("satsLoadingScreen"),
+        globalAppHeader: document.getElementById("globalAppHeader"),
+        globalMenuBackBtn: document.getElementById("globalMenuBackBtn"),
+        globalModuleLabel: document.getElementById("globalModuleLabel"),
+        globalUserLabel: document.getElementById("globalUserLabel"),
+        globalThemeToggleBtn: document.getElementById("globalThemeToggleBtn"),
+        globalManagementBtn: document.getElementById("globalManagementBtn"),
+        globalLogoutBtn: document.getElementById("globalLogoutBtn"),
         appSelectorScreen: document.getElementById("appSelectorScreen"),
         appSelectorUserEmail: document.getElementById("appSelectorUserEmail"),
         managementAppCardMount: document.getElementById("managementAppCardMount"),
@@ -252,6 +288,21 @@
         actionPlanTemplateEditorAreas: document.getElementById("actionPlanTemplateEditorAreas"),
         documentAutomationScreen: document.getElementById("documentAutomationScreen"),
         documentAutomationRoot: document.getElementById("documentAutomationRoot"),
+        euTecnicoScreen: document.getElementById("euTecnicoScreen"),
+        euTecnicoSearch: document.getElementById("euTecnicoSearch"),
+        euTecnicoCompanyList: document.getElementById("euTecnicoCompanyList"),
+        euTecnicoSelectedSummary: document.getElementById("euTecnicoSelectedSummary"),
+        euTecnicoPlansPanel: document.getElementById("euTecnicoPlansPanel"),
+        crewScreen: document.getElementById("crewScreen"),
+        crewProfileList: document.getElementById("crewProfileList"),
+        crewInboxList: document.getElementById("crewInboxList"),
+        crewUnreadBadge: document.getElementById("crewUnreadBadge"),
+        crewMessageForm: document.getElementById("crewMessageForm"),
+        crewRecipientName: document.getElementById("crewRecipientName"),
+        crewRecipientEmail: document.getElementById("crewRecipientEmail"),
+        crewMessageType: document.getElementById("crewMessageType"),
+        crewMessageTitle: document.getElementById("crewMessageTitle"),
+        crewMessageText: document.getElementById("crewMessageText"),
         proceduresScreen: document.getElementById("proceduresScreen"),
         proceduresFrame: document.getElementById("proceduresFrame"),
         profileScreen: document.getElementById("profileScreen"),
@@ -312,6 +363,235 @@
         trainings: els.trainingsBody
       };
 
+      function menuIconSvg(name) {
+        const paths = {
+          home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
+          sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.42 1.42"/><path d="m17.65 17.65 1.42 1.42"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.35 17.65-1.42 1.42"/><path d="m19.07 4.93-1.42 1.42"/>',
+          moon: '<path d="M20.5 14.2A8 8 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>',
+          management: '<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/><path d="m3 7 6-4 6 6 6-5"/>',
+          logout: '<path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 19V5a2 2 0 0 0-2-2h-6"/>',
+          clipboard: '<rect width="14" height="18" x="5" y="3" rx="2"/><path d="M9 3V1h6v2"/><path d="m9 12 2 2 4-4"/>',
+          checklist: '<path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="m3 6 1 1 2-2"/><path d="m3 12 1 1 2-2"/><path d="m3 18 1 1 2-2"/>',
+          search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+          userTool: '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
+          crew: '<path d="M16 21a7 7 0 0 0-14 0"/><circle cx="9" cy="7" r="4"/><path d="M22 21a6 6 0 0 0-6-6"/><path d="M16 3.3a4 4 0 0 1 0 7.4"/>',
+          procedures: '<path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z"/><path d="M8 7h6"/><path d="M8 11h6"/><path d="M8 15h4"/>',
+          automation: '<path d="M14 2H6a2 2 0 0 0-2 2v16h16V8Z"/><path d="M14 2v6h6"/><path d="M8 13h4"/><path d="M8 17h6"/><path d="m17 12 1 1 2-2"/>',
+          arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>'
+        };
+        return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.arrow}</svg>`;
+      }
+
+      function getBrandTheme() {
+        return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      }
+
+      function getStsBrandAsset(kind = "full") {
+        const dark = getBrandTheme() === "dark";
+        if (kind === "icon") return dark ? STS_BRAND.iconDark : STS_BRAND.iconLight;
+        return dark ? STS_BRAND.fullLogoDark : STS_BRAND.fullLogoLight;
+      }
+
+      function getStsBrandTitle(value = "") {
+        const text = String(value || "").trim();
+        if (!text || /^(SATS|STS)$/i.test(text)) return STS_BRAND.title;
+        return text.replace(/\bSATS\b/g, STS_BRAND.shortName);
+      }
+
+      function syncStsBrandAssets() {
+        const fullLogo = getStsBrandAsset("full");
+        const iconLogo = getStsBrandAsset("icon");
+        document.querySelectorAll(".auth-logo[data-brand-light]").forEach(logo => {
+          if (!logo.dataset.customBrandLogo) logo.setAttribute("src", fullLogo);
+        });
+        document.querySelectorAll("[data-sts-brand-icon]").forEach(logo => {
+          logo.setAttribute("src", iconLogo);
+        });
+        const favicon = document.getElementById("satsFavicon");
+        if (favicon && !favicon.dataset.customBrandLogo) favicon.href = iconLogo;
+      }
+
+      function ensureMenuPrototypeDom() {
+        if (!document.getElementById("satsLoadingScreen")) {
+          const loading = document.createElement("section");
+          loading.id = "satsLoadingScreen";
+          loading.className = "sats-loading-screen hidden";
+          loading.setAttribute("aria-live", "polite");
+          loading.innerHTML = `
+            <div class="sats-loading-content">
+              <div class="sats-loading-orbit" aria-hidden="true">
+                <span></span><span></span><span></span>
+                <div class="sats-loading-avatar" id="satsLoadingAvatar">S</div>
+              </div>
+              <strong>STS</strong>
+              <p>Preparando seu ambiente técnico...</p>
+            </div>
+          `;
+          document.body.insertBefore(loading, document.getElementById("appSelectorScreen") || document.body.firstChild);
+        }
+
+        if (!document.getElementById("globalAppHeader")) {
+          const header = document.createElement("header");
+          header.id = "globalAppHeader";
+          header.className = "global-app-header hidden";
+          header.innerHTML = `
+            <div class="global-header-left">
+              <button class="global-header-button" type="button" id="globalMenuBackBtn" aria-label="Voltar ao menu" title="Voltar ao menu">
+                ${menuIconSvg("home")}
+              </button>
+              <div class="global-header-brand">
+                <span class="global-header-brand-mark"><img data-sts-brand-icon src="${getStsBrandAsset("icon")}" alt="STS"></span>
+                <span class="global-header-brand-copy">
+                  <strong>STS</strong>
+                  <span id="globalModuleLabel">${STS_BRAND.fullName}</span>
+                </span>
+              </div>
+            </div>
+            <div class="global-header-right">
+              <span class="global-user-pill" id="globalUserLabel">
+                <span class="global-user-avatar">U</span>
+                <span class="global-user-email">Usuário conectado</span>
+              </span>
+              <button class="global-header-icon" type="button" id="globalThemeToggleBtn" aria-pressed="false" title="Alternar tema">
+                ${menuIconSvg("sun")}
+              </button>
+              <button class="global-header-icon hidden" type="button" id="globalManagementBtn" aria-label="Gestão STS" title="Gestão STS">
+                ${menuIconSvg("management")}
+              </button>
+              <button class="global-header-button danger" type="button" id="globalLogoutBtn" aria-label="Sair" title="Sair">
+                ${menuIconSvg("logout")}
+              </button>
+            </div>
+          `;
+          document.body.insertBefore(header, document.getElementById("appSelectorScreen") || document.body.firstChild);
+        }
+
+        if (!document.getElementById("euTecnicoScreen")) {
+          const screen = document.createElement("main");
+          screen.id = "euTecnicoScreen";
+          screen.className = "screen eu-tecnico-screen hidden";
+          screen.innerHTML = `
+            <section class="eu-tecnico-shell">
+              <aside class="eu-tecnico-sidebar" aria-label="Ferramentas do Eu Técnico">
+                <button class="eu-tecnico-tool" type="button" data-eu-action="new-plan" title="Criar novo plano de ação">
+                  <span class="eu-tecnico-tool-icon">${menuIconSvg("clipboard")}</span>
+                  <span>Criar novo plano de ação</span>
+                </button>
+                <button class="eu-tecnico-tool" type="button" data-eu-action="checklist" title="Checklist técnico">
+                  <span class="eu-tecnico-tool-icon">${menuIconSvg("checklist")}</span>
+                  <span>Checklist técnico</span>
+                </button>
+              </aside>
+              <div class="eu-tecnico-main">
+                <header class="eu-tecnico-hero">
+                  <div>
+                    <p class="section-kicker">Eu Técnico</p>
+                    <h1>Empresas, pastas e planos de ação</h1>
+                    <p>O Plano de Ação continua inteiro por trás; esta é uma entrada mais direta para suas empresas.</p>
+                  </div>
+                  <label class="eu-tecnico-search">
+                    <span>Pesquisar empresa</span>
+                    <span class="eu-tecnico-search-control">
+                      ${menuIconSvg("search")}
+                      <input id="euTecnicoSearch" type="search" placeholder="Pesquisar empresa...">
+                    </span>
+                  </label>
+                </header>
+                <section class="eu-tecnico-layout">
+                  <div class="eu-tecnico-companies">
+                    <div class="eu-tecnico-companies-head">
+                      <h2>Empresas e pastas</h2>
+                      <span class="eu-tecnico-company-count" id="euTecnicoCompanyCount">0</span>
+                    </div>
+                    <div id="euTecnicoCompanyList" class="eu-tecnico-company-list"></div>
+                  </div>
+                  <div class="eu-tecnico-workspace">
+                    <div id="euTecnicoSelectedSummary" class="eu-tecnico-selected-summary"></div>
+                    <div id="euTecnicoPlansPanel" class="eu-tecnico-plans-panel"></div>
+                  </div>
+                </section>
+              </div>
+            </section>
+          `;
+          const anchor = document.getElementById("documentAutomationScreen") || document.getElementById("proceduresScreen");
+          document.body.insertBefore(screen, anchor);
+        }
+
+        if (!document.getElementById("crewScreen")) {
+          const screen = document.createElement("main");
+          screen.id = "crewScreen";
+          screen.className = "screen crew-screen hidden";
+          screen.innerHTML = `
+            <section class="crew-shell">
+              <header class="crew-hero">
+                <div>
+                  <p class="section-kicker">Companheiros de Tripulação</p>
+                  <h1>Pedidos estruturados entre técnicos</h1>
+                  <p>Solicite um plano, peça ajuda ou envie uma pergunta sem abrir um chat livre.</p>
+                </div>
+                <span class="crew-privacy-note">No modo local, as mensagens dependem do dispositivo usado.</span>
+              </header>
+              <section class="crew-layout">
+                <div class="crew-panel">
+                  <div class="crew-panel-head">
+                    <h2>Tripulação</h2>
+                    <span class="crew-panel-count" id="crewProfileCount">0</span>
+                  </div>
+                  <div id="crewProfileList" class="crew-profile-list"></div>
+                </div>
+                <div class="crew-panel">
+                  <div class="crew-panel-head">
+                    <h2>Minhas mensagens</h2>
+                    <span class="crew-panel-count" id="crewMessageCount">0</span>
+                  </div>
+                  <div id="crewInboxList" class="crew-inbox-list"></div>
+                </div>
+              </section>
+            </section>
+          `;
+          const anchor = document.getElementById("documentAutomationScreen") || document.getElementById("proceduresScreen");
+          document.body.insertBefore(screen, anchor);
+        }
+
+        if (!document.getElementById("crewMessageModal")) {
+          const modal = document.createElement("div");
+          modal.id = "crewMessageModal";
+          modal.className = "modal hidden";
+          modal.innerHTML = `
+            <div class="modal-card crew-message-modal-card">
+              <div class="modal-head">
+                <h2>Enviar mensagem</h2>
+                <button class="icon-button" type="button" data-close-modal="crewMessageModal" aria-label="Fechar">×</button>
+              </div>
+              <form class="modal-form" id="crewMessageForm">
+                <div class="crew-recipient-box">
+                  <strong id="crewRecipientName">Destinatário</strong>
+                  <span id="crewRecipientEmail"></span>
+                </div>
+                <label>Tipo
+                  <select id="crewMessageType">
+                    <option value="solicitar_plano_acao">Solicitar plano de ação</option>
+                    <option value="pedir_ajuda">Pedir ajuda com algo</option>
+                    <option value="pergunta_livre">Enviar pergunta livre</option>
+                  </select>
+                </label>
+                <label>Título
+                  <input id="crewMessageTitle" type="text" maxlength="140" required>
+                </label>
+                <label>Mensagem
+                  <textarea id="crewMessageText" maxlength="1200" required></textarea>
+                </label>
+                <div class="modal-actions">
+                  <button class="button ghost" type="button" data-close-modal="crewMessageModal">Cancelar</button>
+                  <button class="button primary" type="submit">Enviar</button>
+                </div>
+              </form>
+            </div>
+          `;
+          document.body.appendChild(modal);
+        }
+      }
+
       const sectionLabels = {
         actions: "ação",
         equipment: "item",
@@ -367,6 +647,8 @@
       }
 
       const PORTAL_ROUTES = {
+        euTecnico: "eu-tecnico",
+        crew: "tripulacao",
         plans: "plano-de-acao",
         procedures: "procedimentos",
         management: "gestao-sats",
@@ -376,6 +658,13 @@
       const PORTAL_ROUTE_ALIASES = {
         "": null,
         "index.html": null,
+        menu: null,
+        "eu-tecnico": "euTecnico",
+        eutecnico: "euTecnico",
+        "modulo-tecnico": "euTecnico",
+        "companheiros-de-tripulacao": "crew",
+        tripulacao: "crew",
+        crew: "crew",
         "plano-de-acao": "plans",
         "modulo-1": "plans",
         plans: "plans",
@@ -456,6 +745,17 @@
         bindSessionLifecycleEvents();
         renderColorPalette(els.profileColorPalette, AVATAR_COLORS, selectedProfileColor, handleProfileColorSelect);
         renderColorPalette(els.folderColorPalette, FOLDER_COLORS, selectedFolderColor, handleFolderColorSelect);
+        handleRecoveryEntryPoint();
+        if (isRecoveryModeActive()) {
+          app = readLocalSharedCache() || createEmptyApp();
+          currentUser = null;
+          cloudReady = false;
+          isHydrating = false;
+          renderApp();
+          renderRecoveryBanner();
+          if (recoveryModeRequestedFromUrl()) openRecoveryScreen();
+          return;
+        }
         setupSupabase();
         await handleAuthRedirectParams();
         await hydrateAuthenticatedUser();
@@ -496,16 +796,25 @@
           recordActivity("Alterou tema", `Tema visual alterado para ${normalized === "dark" ? "modo dark" : "modo light"}.`);
         }
         updateThemeToggle();
+        syncStsBrandAssets();
       }
 
       function updateThemeToggle() {
-        if (!els.themeToggleBtn) return;
         const isDark = document.documentElement.dataset.theme === "dark";
-        els.themeToggleBtn.classList.toggle("is-dark", isDark);
-        els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
-        els.themeToggleBtn.title = isDark ? "Alterar para modo claro" : "Alterar para modo escuro";
-        const label = els.themeToggleBtn.querySelector("[data-theme-label]");
-        if (label) label.textContent = isDark ? "Modo dark" : "Modo light";
+        if (els.themeToggleBtn) {
+          els.themeToggleBtn.classList.toggle("is-dark", isDark);
+          els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
+          els.themeToggleBtn.title = isDark ? "Alterar para modo claro" : "Alterar para modo escuro";
+          const label = els.themeToggleBtn.querySelector("[data-theme-label]");
+          if (label) label.textContent = isDark ? "Modo dark" : "Modo light";
+        }
+        if (els.globalThemeToggleBtn) {
+          els.globalThemeToggleBtn.classList.toggle("is-dark", isDark);
+          els.globalThemeToggleBtn.setAttribute("aria-pressed", String(isDark));
+          els.globalThemeToggleBtn.innerHTML = menuIconSvg(isDark ? "moon" : "sun");
+          els.globalThemeToggleBtn.title = isDark ? "Alterar para modo claro" : "Alterar para modo escuro";
+          els.globalThemeToggleBtn.setAttribute("aria-label", els.globalThemeToggleBtn.title);
+        }
       }
 
       function isRestrictedAdminEmail(email) {
@@ -523,6 +832,48 @@
 
       function normalizeEmail(email) {
         return String(email || "").trim().toLocaleLowerCase("pt-BR");
+      }
+
+      function protectedProfileIdentityConflict(profile, loggedEmail = "", loggedUserId = "") {
+        if (!profile) return "";
+        const currentEmail = normalizeEmail(loggedEmail || currentUser?.email || "");
+        const currentUserId = String(loggedUserId || currentUser?.id || "");
+        const profileUserId = String(profile.userId || "");
+        const profileEmail = normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "");
+        const profileName = normalizeText(profile.name || profile.displayName || "");
+        if (currentUserId && profileUserId && profileUserId !== currentUserId) return "O perfil encontrado tem userId diferente do usuario logado.";
+        if (currentEmail && profileEmail && profileEmail !== currentEmail) return "O perfil encontrado tem e-mail diferente do usuario logado.";
+        if (currentEmail === normalizeEmail(SUPER_ADMIN_EMAIL) && profileName.includes("layanne")) return "Perfil com nome da Layanne nao pode ser associado ao e-mail do Abner.";
+        if (currentEmail === normalizeEmail(LAYANNE_PROFILE_EMAIL) && profileName.includes("abner")) return "Perfil com nome do Abner nao pode ser associado ao e-mail da Layanne.";
+        if (profileEmail === normalizeEmail(SUPER_ADMIN_EMAIL) && profileName.includes("layanne")) return "Perfil com nome da Layanne esta usando e-mail do Abner.";
+        if (profileEmail === normalizeEmail(LAYANNE_PROFILE_EMAIL) && profileName.includes("abner")) return "Perfil com nome do Abner esta usando e-mail da Layanne.";
+        return "";
+      }
+
+      function repairDuplicateLoggedUserId(state = app, loggedEmail = "", loggedUserId = "") {
+        const email = normalizeEmail(loggedEmail || currentUser?.email || "");
+        const userId = String(loggedUserId || currentUser?.id || "");
+        if (!state || !email || !userId || !Array.isArray(state.profiles)) return { changed: false, keptProfile: null, repairedProfiles: [] };
+        const profiles = state.profiles.filter(profile => profile && !profile.hidden && profile.userId && String(profile.userId) === userId);
+        if (profiles.length <= 1) return { changed: false, keptProfile: profiles[0] || null, repairedProfiles: [] };
+        const exactEmailProfiles = profiles.filter(profile => normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "") === email);
+        if (exactEmailProfiles.length !== 1) return { changed: false, keptProfile: null, repairedProfiles: [] };
+        const keptProfile = exactEmailProfiles[0];
+        const repairedProfiles = [];
+        profiles.forEach(profile => {
+          if (profile === keptProfile || String(profile.id || "") === String(keptProfile.id || "")) return;
+          const previousUserId = profile.userId;
+          profile.previousConflictingUserId = profile.previousConflictingUserId || previousUserId;
+          profile.userId = "";
+          profile.identityRepairedAt = new Date().toISOString();
+          repairedProfiles.push(profile);
+        });
+        if (repairedProfiles.length) {
+          dirtyProfileIds.add(keptProfile.id);
+          repairedProfiles.forEach(profile => dirtyProfileIds.add(profile.id));
+          recordActivity("Tentativa bloqueada de associar perfil errado", `UserId duplicado removido de ${repairedProfiles.length} perfil(is) que nao correspondem ao e-mail ${email}.`);
+        }
+        return { changed: repairedProfiles.length > 0, keptProfile, repairedProfiles };
       }
 
       function canAccessDocumentAutomation(user = currentUser) {
@@ -940,7 +1291,7 @@
           action,
           entityType: plan ? "plan" : targetProfile ? "profile" : "system",
           entityId: plan?.id || targetProfile?.id || SHARED_STATE_ID,
-          entityLabel: plan?.title || targetProfile?.name || "SATS",
+          entityLabel: plan?.title || targetProfile?.name || "STS",
           clientId: plan?.clientId || targetProfile?.clientId || "",
           profileId: targetProfile?.id || "",
           planId: plan?.id || "",
@@ -1061,6 +1412,14 @@
         });
         document.getElementById("switchUserForm").addEventListener("submit", handleSwitchUserLogin);
         if (els.themeToggleBtn) els.themeToggleBtn.addEventListener("click", toggleThemePreference);
+        if (els.globalMenuBackBtn) els.globalMenuBackBtn.addEventListener("click", showAppSelector);
+        if (els.globalThemeToggleBtn) els.globalThemeToggleBtn.addEventListener("click", toggleThemePreference);
+        if (els.globalManagementBtn) els.globalManagementBtn.addEventListener("click", () => {
+          if (!canAccessManagementPhase1()) return;
+          selectedPortalApp = "management";
+          renderApp();
+        });
+        if (els.globalLogoutBtn) els.globalLogoutBtn.addEventListener("click", logout);
         if (els.adminModeToggle) els.adminModeToggle.addEventListener("click", toggleSystemAdminMode);
         if (els.managementTabs) els.managementTabs.addEventListener("click", handleManagementTabClick);
         if (els.managementContent) {
@@ -1112,6 +1471,13 @@
         els.improvementList.addEventListener("click", handleImprovementListClick);
         els.resolvedImprovementToggle.addEventListener("click", toggleResolvedImprovements);
         els.resolvedImprovementList.addEventListener("click", handleImprovementListClick);
+        if (els.euTecnicoSearch) els.euTecnicoSearch.addEventListener("input", event => {
+          euTecnicoSearchTerm = event.target.value || "";
+          renderEuTecnico();
+        });
+        if (els.euTecnicoScreen) els.euTecnicoScreen.addEventListener("click", handleEuTecnicoClick);
+        if (els.crewScreen) els.crewScreen.addEventListener("click", handleCrewClick);
+        if (els.crewMessageForm) els.crewMessageForm.addEventListener("submit", submitCrewMessage);
         els.suggestionReportForm.addEventListener("submit", sendSuggestionResolutionReport);
         document.getElementById("saveSuggestionReportDraftBtn").addEventListener("click", saveSuggestionResolutionDraft);
         els.suggestionRejectionForm.addEventListener("submit", submitSuggestionRejection);
@@ -1414,6 +1780,13 @@
         if (cachedUpdatedAt && cachedUpdatedAt === lastSharedUpdatedAt) return;
         const cached = readLocalSharedCache();
         if (!cached) return;
+        const cacheSafety = isRemoteStateSafeToApply(app, cached);
+        if (!cacheSafety.safe) {
+          console.warn("[STS] Cache compartilhado de outra aba recusado:", cacheSafety.reason, cacheSafety.diagnostics);
+          recordActivity("Recusou estado remoto corrompido", `Cache de outra aba recusado: ${cacheSafety.reason}`);
+          renderRecoveryBanner(`Sincronizacao pausada: ${cacheSafety.reason}`);
+          return;
+        }
         app = restoreLocalNavigation(cached, captureLocalNavigation());
         if (cachedUpdatedAt) lastSharedUpdatedAt = cachedUpdatedAt;
         selectedActions.clear();
@@ -1606,6 +1979,266 @@
         }
       }
 
+      function showPostLoginLoading(user = currentUser) {
+        if (!els.satsLoadingScreen) return;
+        postLoginLoadingStartedAt = Date.now();
+        updatePostLoginLoadingAvatar(user);
+        els.satsLoadingScreen.classList.remove("hidden");
+      }
+
+      function updatePostLoginLoadingAvatar(user = currentUser) {
+        if (!els.satsLoadingScreen) return;
+        const avatar = els.satsLoadingScreen.querySelector("#satsLoadingAvatar");
+        const profile = user ? findAvatarProfileByUser(user) : null;
+        const cachedAvatar = getCachedProfileAvatar(user);
+        const storedAvatar = getStoredProfileAvatar(user);
+        const avatarPhoto = profile?.avatarPhoto || cachedAvatar?.avatarPhoto || storedAvatar?.avatarPhoto || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+        if (avatar) {
+          if (avatarPhoto) {
+            avatar.classList.add("has-photo");
+            avatar.innerHTML = `<img src="${escapeAttr(avatarPhoto)}" alt="">`;
+            if (profile?.avatarPhoto) cacheProfileAvatar(user, profile);
+            else if (storedAvatar?.avatarPhoto) cacheProfileAvatar(user, storedAvatar);
+          } else {
+            avatar.classList.remove("has-photo");
+            avatar.textContent = userInitials(user?.email || cachedAvatar?.name || storedAvatar?.name || profile?.name || "STS");
+          }
+        }
+      }
+
+      function findAvatarProfileByUser(user = currentUser) {
+        const resolvedProfile = findProfileByUser(user);
+        if (resolvedProfile?.avatarPhoto) return resolvedProfile;
+        if (!user || !app || !Array.isArray(app.profiles)) return resolvedProfile || null;
+        const email = normalizeEmail(user.email || "");
+        const profilesWithPhoto = app.profiles.filter(profile => !profile.hidden && profile.avatarPhoto);
+        return profilesWithPhoto.find(profile => profile.userId && user.id && String(profile.userId) === String(user.id))
+          || profilesWithPhoto.find(profile => email && normalizeEmail(profile.email || "") === email)
+          || profilesWithPhoto.find(profile => looseUserNameMatches(profile.name || "", user))
+          || profilesWithPhoto.find(profile => profile.id && profile.id === app.activeProfileId)
+          || teamProfiles.find(profile => profile.avatarPhoto && profile.userId && user.id && String(profile.userId) === String(user.id))
+          || teamProfiles.find(profile => profile.avatarPhoto && email && normalizeEmail(profile.email || "") === email)
+          || teamProfiles.find(profile => profile.avatarPhoto && looseUserNameMatches(profile.name || "", user))
+          || resolvedProfile
+          || null;
+      }
+
+      function profileAvatarCacheKey(user = currentUser) {
+        const email = normalizeEmail(user?.email || "");
+        const id = String(user?.id || "");
+        return email || id ? `sats.profileAvatarCache.v1.${email || id}` : "";
+      }
+
+      function getCachedProfileAvatar(user = currentUser) {
+        const key = profileAvatarCacheKey(user);
+        if (!key) return null;
+        try {
+          const parsed = JSON.parse(localStorage.getItem(key) || "null");
+          return parsed && parsed.avatarPhoto ? parsed : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function getStoredProfileAvatar(user = currentUser) {
+        if (!user) return null;
+        const email = normalizeEmail(user.email || "");
+        const userId = String(user.id || "");
+        const stores = [SHARED_STORAGE_KEY, STORAGE_KEY];
+        for (const key of stores) {
+          let data = null;
+          try {
+            data = JSON.parse(localStorage.getItem(key) || "null");
+          } catch (error) {
+            data = null;
+          }
+          const profiles = Array.isArray(data?.profiles) ? data.profiles.filter(profile => profile && profile.avatarPhoto) : [];
+          if (!profiles.length) continue;
+          const direct = profiles.find(profile => profile.userId && userId && String(profile.userId) === userId)
+            || profiles.find(profile => email && normalizeEmail(profile.email || "") === email);
+          if (direct) return {
+            avatarPhoto: direct.avatarPhoto,
+            name: direct.name || direct.email || user.email || ""
+          };
+        }
+        return null;
+      }
+
+      function cacheProfileAvatar(user = currentUser, profile = null) {
+        const key = profileAvatarCacheKey(user);
+        const avatarPhoto = profile?.avatarPhoto || "";
+        if (!key) return;
+        if (!avatarPhoto) {
+          try {
+            localStorage.removeItem(key);
+          } catch (error) {
+            console.warn("Nao foi possivel limpar a foto do perfil para o loading:", error);
+          }
+          return;
+        }
+        try {
+          localStorage.setItem(key, JSON.stringify({
+            avatarPhoto,
+            name: profile?.name || user?.email || "",
+            updatedAt: new Date().toISOString()
+          }));
+        } catch (error) {
+          console.warn("NÃ£o foi possÃ­vel guardar a foto do perfil para o loading:", error);
+        }
+      }
+
+      async function finishPostLoginLoading() {
+        if (!els.satsLoadingScreen) return;
+        const elapsed = Date.now() - (postLoginLoadingStartedAt || Date.now());
+        const wait = Math.max(0, 1100 - elapsed);
+        if (wait) await delay(wait);
+        els.satsLoadingScreen.classList.add("hidden");
+      }
+
+      function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      function withLoadingTimeout(promise, onTimeout, timeoutMs = 5000) {
+        let settled = false;
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            try {
+              resolve(onTimeout());
+            } catch (error) {
+              reject(error);
+            }
+          }, timeoutMs);
+          Promise.resolve(promise).then(value => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(value);
+          }).catch(error => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+          });
+        });
+      }
+
+      function userInitials(value) {
+        const text = String(value || "STS").split("@")[0].replace(/[._-]+/g, " ").trim();
+        const parts = text.split(/\s+/).filter(Boolean);
+        return ((parts[0]?.[0] || "S") + (parts[1]?.[0] || "")).toUpperCase();
+      }
+
+      function findProfileByUser(user = currentUser) {
+        if (!user) return null;
+        const resolved = resolveCurrentUserProfileSafely(user.email || "", app);
+        return resolved.found ? resolved.profile : null;
+      }
+
+      function profileHasWorkData(profile) {
+        if (!profile) return false;
+        return !!profile.avatarPhoto
+          || (profile.folders || []).some(folder => !folder.isDefault)
+          || (profile.plans || []).some(plan => !plan.deleted)
+          || (profile.documents || []).length > 0;
+      }
+
+      function profileHasEuTecnicoData(profile) {
+        if (!profile) return false;
+        return (profile.folders || []).some(folder => !folder.isDefault)
+          || (profile.plans || []).some(plan => !plan.deleted)
+          || (profile.documents || []).length > 0;
+      }
+
+      function currentUserNameMatches(user = currentUser) {
+        const localPart = user?.email ? String(user.email).split("@")[0] : "";
+        const localWords = localPart.replace(/[._-]+/g, " ").trim();
+        const candidates = [
+          user?.name,
+          user?.displayName,
+          user?.user_metadata?.name,
+          user?.user_metadata?.full_name,
+          localPart,
+          localWords,
+          localWords.split(/\s+/)[0] || ""
+        ];
+        return candidates.map(normalizeText).filter(Boolean);
+      }
+
+      function looseUserNameMatches(value, user = currentUser) {
+        const name = normalizeText(value || "");
+        if (!name) return false;
+        return currentUserNameMatches(user).some(candidate => {
+          if (!candidate || candidate.length < 3) return false;
+          return name === candidate
+            || name.startsWith(candidate)
+            || candidate.startsWith(name)
+            || name.includes(candidate)
+            || candidate.includes(name);
+        });
+      }
+
+      function isProfileOwnedByCurrentUser(profile, user = currentUser) {
+        if (!profile || !user) return false;
+        const currentEmail = normalizeEmail(user.email);
+        const profileEmail = normalizeEmail(profile.email);
+        if (profile.userId && user.id && String(profile.userId) === String(user.id)) return true;
+        if (profileEmail && currentEmail && profileEmail === currentEmail) return true;
+        return false;
+      }
+
+      function isFolderOwnedByCurrentUser(folder, user = currentUser, profile = null) {
+        if (!folder || !user) return false;
+        const currentEmail = normalizeEmail(user.email);
+        const profileOwned = isProfileOwnedByCurrentUser(profile, user);
+        const currentProfileId = String(profileOwned ? profile?.id || user.profileId || "" : user.profileId || "");
+        const currentProfileName = normalizeText(profileOwned ? profile?.name || user.name || user.displayName || user.user_metadata?.name || user.email?.split("@")[0] || "" : user.name || user.displayName || user.user_metadata?.name || user.email?.split("@")[0] || "");
+        const folderOwnerEmail = normalizeEmail(folder.createdBy || folder.ownerEmail || folder.userEmail || "");
+        const folderProfileId = String(folder.profileId || folder.ownerProfileId || folder.profile?.id || "");
+        const folderOwnerName = normalizeText(folder.ownerName || folder.profileName || folder.createdByName || "");
+        if (folderOwnerEmail && currentEmail && folderOwnerEmail === currentEmail) return true;
+        if (profileOwned && folderProfileId && currentProfileId && folderProfileId === currentProfileId) return true;
+        if (profileOwned && folderOwnerName && currentProfileName && folderOwnerName === currentProfileName) return true;
+        return profileOwned && !folderOwnerEmail && !folderProfileId && !folderOwnerName;
+      }
+
+      function isDocumentOwnedByCurrentUser(document, user = currentUser, profile = null) {
+        if (!document || !user) return false;
+        const currentEmail = normalizeEmail(user.email);
+        const ownerEmail = normalizeEmail(document.createdBy || document.ownerEmail || document.userEmail || "");
+        const profileId = String(document.profileId || document.ownerProfileId || "");
+        const profileOwned = isProfileOwnedByCurrentUser(profile, user);
+        if (ownerEmail && currentEmail && ownerEmail === currentEmail) return true;
+        if (profileOwned && profileId && profile?.id && profileId === String(profile.id)) return true;
+        return profileOwned && !ownerEmail && !profileId;
+      }
+
+      function normalizeEuTecnicoOwnership(profile) {
+        if (!isProfileOwnedByCurrentUser(profile)) return false;
+        const email = normalizeEmail(profile.email || currentUser?.email || "");
+        let changed = false;
+        (profile.folders || []).forEach(folder => {
+          if (!isFolderOwnedByCurrentUser(folder, currentUser, profile)) return;
+          if (!folder.createdBy && email) { folder.createdBy = email; changed = true; }
+          if (!folder.ownerEmail && email) { folder.ownerEmail = email; changed = true; }
+          if (!folder.profileId && profile.id) { folder.profileId = profile.id; changed = true; }
+          if (!folder.ownerName && profile.name) { folder.ownerName = profile.name; changed = true; }
+        });
+        (profile.plans || []).forEach(plan => {
+          if (!isDocumentOwnedByCurrentUser(plan, currentUser, profile)) return;
+          if (!plan.createdBy && email) { plan.createdBy = email; changed = true; }
+          if (!plan.profileId && profile.id) { plan.profileId = profile.id; changed = true; }
+        });
+        (profile.documents || []).forEach(document => {
+          if (!isDocumentOwnedByCurrentUser(document, currentUser, profile)) return;
+          if (!document.createdBy && email) { document.createdBy = email; changed = true; }
+          if (!document.profileId && profile.id) { document.profileId = profile.id; changed = true; }
+        });
+        return changed;
+      }
+
       async function hydrateUser(user) {
         if (currentUser && currentUser.id === user.id && cloudReady) return;
         if (hydrateUserPromise && hydrateUserId === user.id) {
@@ -1615,26 +2248,43 @@
         hydrateUserId = user.id;
         hydrateUserPromise = (async () => {
           if (currentUser && currentUser.id !== user.id) stopSharedSync();
+          profileConflictActive = false;
           currentUser = user;
           postponedSuggestionNotificationIds.clear();
           applyStoredTheme();
           cloudReady = false;
+          showPostLoginLoading(user);
           setAuthMessage("Carregando seus dados do banco...", "");
           try {
-            app = await loadAppFromCloud(user);
+            app = await withLoadingTimeout(loadAppFromCloud(user), () => {
+              console.warn("[STS] Carregamento compartilhado excedeu o tempo seguro; abrindo com cache/local.");
+              showToast("O banco demorou para responder. Abrindo com os dados locais disponíveis.", "warning", 5000);
+              return readLocalSharedCache() || createEmptyApp();
+            });
             await publishOwnProfileIfNeeded();
             await loadTeamProfiles();
+            updatePostLoginLoadingAvatar(user);
             app.view = "profiles";
             app.activeProfileId = null;
             app.activeFolderId = DEFAULT_FOLDER_ID;
             app.activePlanId = null;
+            if (profileConflictActive) {
+              cloudReady = false;
+              stopSharedSync();
+              await finishPostLoginLoading();
+              renderApp();
+              setAuthMessage("Conflito de perfil detectado. A sincronizacao foi pausada para proteger os dados.", "error");
+              return;
+            }
             cloudReady = true;
             startSharedSync();
             resetInactivityTimer({ force: true });
             const ownProfile = isRestrictedAdminUser(user) ? null : updateOwnLastAccess();
+            updatePostLoginLoadingAvatar(user);
             recordActivity("Entrou no sistema", `Login realizado por ${user.email || "usuário"}.`, { profile: ownProfile || null });
             if (ownProfile) saveApp({ profileId: ownProfile.id });
             else saveApp({ localOnly: true });
+            await finishPostLoginLoading();
             renderApp();
             setAuthMessage(`Conectado como ${user.email || "usuário"}.`, "ok");
             if (pendingPasswordRecovery) {
@@ -1644,9 +2294,13 @@
             }
           } catch (error) {
             console.error(error);
-            app = createEmptyApp();
+            app = readLocalSharedCache() || createEmptyApp();
             cloudReady = false;
             stopSharedSync();
+            recordActivity("Supabase indisponivel", "Falha ao carregar banco compartilhado; usando cache local.");
+            renderRecoveryBanner("Supabase indisponivel. Usando dados locais em modo protegido.");
+            showToast("Supabase indisponivel. Usando dados locais em modo protegido.", "warning", 8000);
+            await finishPostLoginLoading();
             renderApp();
             setAuthMessage("Login aceito, mas o banco compartilhado não abriu. Verifique a tabela shared_states, as políticas RLS e a conexão antes de usar.", "error");
             if (pendingPasswordRecovery) {
@@ -1761,6 +2415,720 @@
         setTimeout(() => closeModal("passwordModal"), 900);
       }
 
+      function recoveryModeRequestedFromUrl() {
+        const query = new URLSearchParams(window.location.search || "");
+        return query.get("recovery") === "1" || String(window.location.hash || "").toLowerCase().includes("recovery");
+      }
+
+      function isRecoveryModeActive() {
+        try {
+          return localStorage.getItem(RECOVERY_MODE_KEY) === "true";
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function activateRecoveryMode(reason = "manual") {
+        try {
+          localStorage.setItem(RECOVERY_MODE_KEY, "true");
+          localStorage.setItem(RECOVERY_REASON_KEY, reason);
+        } catch (error) {
+          console.warn("Nao foi possivel ativar o modo recuperacao:", error);
+        }
+        stopSharedSync();
+        cloudReady = false;
+        recordActivity("Ativou modo recuperacao", `Origem: ${reason}.`);
+        renderRecoveryBanner();
+      }
+
+      function deactivateRecoveryMode() {
+        try {
+          localStorage.removeItem(RECOVERY_MODE_KEY);
+          localStorage.removeItem(RECOVERY_REASON_KEY);
+        } catch (error) {
+          console.warn("Nao foi possivel desativar o modo recuperacao:", error);
+        }
+        recordActivity("Desativou modo recuperacao", "Sincronizacao liberada manualmente.");
+        renderRecoveryBanner();
+        showToast("Modo de recuperacao desativado. Recarregue a pagina para religar a sincronizacao.", "success", 6000);
+      }
+
+      function isProfileConflictReadOnlyMode() {
+        try {
+          return sessionStorage.getItem(PROFILE_CONFLICT_READONLY_KEY) === "true";
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function setProfileConflictReadOnlyMode(active) {
+        try {
+          if (active) sessionStorage.setItem(PROFILE_CONFLICT_READONLY_KEY, "true");
+          else sessionStorage.removeItem(PROFILE_CONFLICT_READONLY_KEY);
+        } catch (error) {
+          console.warn("Nao foi possivel alterar modo somente leitura:", error);
+        }
+      }
+
+      function handleRecoveryEntryPoint() {
+        if (recoveryModeRequestedFromUrl()) activateRecoveryMode("url");
+      }
+
+      function renderRecoveryBanner(message = "") {
+        let banner = document.getElementById("stsRecoveryBanner");
+        const recoveryActive = isRecoveryModeActive();
+        if (!recoveryActive && !message) {
+          if (banner) banner.remove();
+          document.body.classList.remove("sts-recovery-active");
+          return;
+        }
+        if (!banner) {
+          banner = document.createElement("div");
+          banner.id = "stsRecoveryBanner";
+          banner.className = "sts-recovery-banner";
+          document.body.appendChild(banner);
+        }
+        document.body.classList.add("sts-recovery-active");
+        banner.innerHTML = `
+          <strong>${recoveryActive ? "Modo de recuperacao ativo" : "Sincronizacao protegida"}</strong>
+          <span>${escapeHtml(message || "Sincronizacao com Supabase pausada. O STS esta usando somente dados locais.")}</span>
+          <button class="button small" type="button" data-recovery-open>Recuperacao STS</button>
+          ${recoveryActive && isFullSystemAdmin() ? '<button class="button small ghost" type="button" data-recovery-disable>Desativar</button>' : ""}`;
+        banner.querySelector("[data-recovery-open]")?.addEventListener("click", openRecoveryScreen);
+        banner.querySelector("[data-recovery-disable]")?.addEventListener("click", async () => {
+          if (!await openConfirmModal({
+            title: "Desativar modo de recuperacao",
+            message: "A sincronizacao com Supabase sera liberada novamente. Faca isso somente depois de confirmar que os dados locais estao corretos.",
+            requiredText: "DESATIVAR",
+            confirmLabel: "Desativar",
+            tone: "primary"
+          })) return;
+          deactivateRecoveryMode();
+        });
+      }
+
+      function parseMaybeJson(value) {
+        if (!value) return null;
+        if (typeof value === "object") return value;
+        try {
+          return JSON.parse(String(value));
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function allBrowserStorageSnapshot() {
+        const readStore = store => {
+          const data = {};
+          for (let index = 0; index < store.length; index += 1) {
+            const key = store.key(index);
+            data[key] = store.getItem(key);
+          }
+          return data;
+        };
+        return {
+          createdAt: new Date().toISOString(),
+          url: window.location.href,
+          origin: window.location.origin,
+          userAgent: navigator.userAgent,
+          localStorage: readStore(localStorage),
+          sessionStorage: readStore(sessionStorage)
+        };
+      }
+
+      function downloadCurrentStorageBackup(prefix = "BACKUP_ANTES_DA_RESTAURACAO_STS") {
+        const payload = allBrowserStorageSnapshot();
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), `${prefix}_${stamp}.json`);
+        return payload;
+      }
+
+      function extractSharedStateFromBackup(raw) {
+        const candidates = [
+          raw,
+          raw?.data,
+          raw?.sharedData,
+          raw?.shared,
+          raw?.app,
+          parseMaybeJson(raw?.[SHARED_STORAGE_KEY]),
+          parseMaybeJson(raw?.localStorage?.[SHARED_STORAGE_KEY]),
+          parseMaybeJson(raw?.localStorage?.[STORAGE_KEY])
+        ].filter(Boolean);
+        const found = candidates.find(candidate => candidate && Array.isArray(candidate.profiles));
+        return found ? normalizeApp(found) : null;
+      }
+
+      function stateStats(state) {
+        const profiles = Array.isArray(state?.profiles) ? state.profiles : [];
+        const folders = profiles.reduce((sum, profile) => sum + (profile.folders || []).length + (profile.planFolders || []).length, 0);
+        const plans = profiles.reduce((sum, profile) => sum + (profile.plans || []).length, 0);
+        const documents = profiles.reduce((sum, profile) => sum + (profile.documents || []).length, 0);
+        const checklists = profiles.reduce((sum, profile) => sum + (profile.documents || []).filter(doc => doc.type === "checklist").length, 0);
+        const textDocuments = profiles.reduce((sum, profile) => sum + (profile.documents || []).filter(doc => doc.type === "textDocument").length, 0);
+        return { profiles: profiles.length, folders, plans, documents, checklists, textDocuments };
+      }
+
+      function profileRecoverySummary(profile) {
+        const folders = (profile.folders || []).length + (profile.planFolders || []).length;
+        const plans = (profile.plans || []).length;
+        const checklists = (profile.documents || []).filter(doc => doc.type === "checklist").length;
+        const textDocuments = (profile.documents || []).filter(doc => doc.type === "textDocument").length;
+        return { id: profile.id || "", name: profile.name || "Sem nome", email: profile.email || "", folders, plans, checklists, textDocuments };
+      }
+
+      function addIntegrityIssue(issues, severity, message, context = {}) {
+        issues.push({ severity, message, context });
+      }
+
+      function runIntegrityDiagnostics(state, remoteState = null) {
+        const checked = normalizeApp(state || createEmptyApp());
+        const issues = [];
+        const profiles = checked.profiles || [];
+        if (!profiles.length) addIntegrityIssue(issues, "error", "Estado sem perfis.");
+        const byId = new Map();
+        const byEmail = new Map();
+        const byNameEmail = new Map();
+        const abnerEmail = "abner.l@outlook.com";
+        const layanneEmail = "segurancadotrabalho@protege.med.br";
+        profiles.forEach(profile => {
+          const id = String(profile.id || "");
+          const email = normalizeEmail(profile.email || "");
+          const name = normalizeText(profile.name || "");
+          const summary = profileRecoverySummary(profile);
+          if (!id) addIntegrityIssue(issues, "warning", `Perfil sem ID: ${profile.name || "sem nome"}.`, { profile });
+          if (!email) addIntegrityIssue(issues, "warning", `Perfil sem e-mail: ${profile.name || id || "sem nome"}.`, { profileId: id });
+          if (id) byId.set(id, [...(byId.get(id) || []), profile]);
+          if (email) byEmail.set(email, [...(byEmail.get(email) || []), profile]);
+          if (email === abnerEmail && name.includes("layanne")) {
+            addIntegrityIssue(issues, "error", "Nome/e-mail incompatíveis: perfil com nome da Layanne esta usando o e-mail do Abner.", { profileId: id, email });
+          }
+          if (email === layanneEmail && name.includes("abner")) {
+            addIntegrityIssue(issues, "error", "Nome/e-mail incompatíveis: perfil com nome do Abner esta usando o e-mail da Layanne.", { profileId: id, email });
+          }
+          if (name || email) {
+            const nameEmailKey = `${name}|${email}`;
+            byNameEmail.set(nameEmailKey, [...(byNameEmail.get(nameEmailKey) || []), profile]);
+          }
+          if (summary.folders === 0 && summary.plans === 0 && summary.checklists === 0 && summary.textDocuments === 0) {
+            addIntegrityIssue(issues, "warning", `Perfil zerado ou sem dados: ${profile.name || email || id || "sem nome"}.`, { profileId: id, email });
+          }
+        });
+        byId.forEach((items, id) => {
+          if (items.length > 1) addIntegrityIssue(issues, "error", `ID duplicado em ${items.length} perfis: ${id}.`, { id, names: items.map(item => item.name) });
+        });
+        byEmail.forEach((items, email) => {
+          if (items.length > 1) addIntegrityIssue(issues, "error", `E-mail duplicado em ${items.length} perfis: ${email}.`, { email, names: items.map(item => item.name) });
+        });
+        byNameEmail.forEach((items, key) => {
+          if (items.length > 1) addIntegrityIssue(issues, "warning", `Nome + e-mail duplicados em ${items.length} perfis: ${key}.`, { key, ids: items.map(item => item.id) });
+        });
+
+        const abnerProfiles = profiles.filter(profile => normalizeEmail(profile.email) === abnerEmail || normalizeText(profile.name).includes("abner"));
+        const layanneProfiles = profiles.filter(profile => normalizeEmail(profile.email) === layanneEmail || normalizeText(profile.name).includes("layanne"));
+        abnerProfiles.forEach(abner => {
+          layanneProfiles.forEach(layanne => {
+            if (abner.id && layanne.id && String(abner.id) === String(layanne.id)) {
+              addIntegrityIssue(issues, "error", "Conflito grave: Abner e Layanne possuem o mesmo ID.", { id: abner.id });
+            }
+          });
+        });
+        layanneProfiles.forEach(profile => {
+          if (normalizeEmail(profile.email) === abnerEmail) addIntegrityIssue(issues, "error", "Conflito grave: perfil da Layanne esta com o e-mail do Abner.", { profileId: profile.id });
+        });
+        abnerProfiles.forEach(profile => {
+          const folders = (profile.folders || []).length + (profile.planFolders || []).length;
+          const plans = (profile.plans || []).length;
+          if (folders >= 8 && plans >= 9 && layanneProfiles.some(item => ((item.folders || []).length + (item.planFolders || []).length) <= 1 && (item.plans || []).length === 0)) {
+            addIntegrityIssue(issues, "warning", "Distribuicao suspeita: Abner com muitos dados e Layanne quase vazia. Verifique se houve troca de perfis.", { profileId: profile.id });
+          }
+          const layanneOwnershipSignals = [
+            ...(profile.folders || []).flatMap(folder => [folder.ownerEmail, folder.userEmail, folder.createdBy, folder.ownerName, folder.profileName]),
+            ...(profile.plans || []).flatMap(plan => [plan.ownerEmail, plan.userEmail, plan.createdBy, plan.ownerName])
+          ].map(value => normalizeText(value || ""));
+          if (layanneOwnershipSignals.some(value => value.includes("layanne") || value === layanneEmail)) {
+            addIntegrityIssue(issues, "error", "Conflito grave: perfil do Abner contem pastas/planos com sinais de propriedade da Layanne.", { profileId: profile.id });
+          }
+        });
+
+        profiles.forEach(profile => {
+          const folderIds = new Set((profile.folders || []).map(folder => String(folder.id || "")));
+          (profile.folders || []).forEach(folder => {
+            if (!folder.isDefault && !folder.createdBy && !folder.ownerEmail && !folder.userEmail && !folder.ownerProfileId && !folder.profileId) {
+              addIntegrityIssue(issues, "warning", `Pasta sem dono claro: ${folder.name || folder.id || "sem nome"}.`, { profileId: profile.id, folderId: folder.id });
+            }
+          });
+          (profile.plans || []).forEach(plan => {
+            const folderId = String(plan.folderId || DEFAULT_FOLDER_ID);
+            const profileEmail = normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "");
+            const planOwnerEmail = normalizeEmail(plan.ownerEmail || plan.userEmail || plan.createdBy || "");
+            const planProfileId = String(plan.ownerProfileId || plan.profileId || "");
+            if (planOwnerEmail && profileEmail && planOwnerEmail !== profileEmail) {
+              addIntegrityIssue(issues, "error", `Plano em perfil errado: ${plan.title || plan.id || "sem titulo"} pertence a outro e-mail.`, { profileId: profile.id, planId: plan.id, planOwnerEmail, profileEmail });
+            }
+            if (planProfileId && profile.id && planProfileId !== String(profile.id)) {
+              addIntegrityIssue(issues, "error", `Plano em perfil errado: ${plan.title || plan.id || "sem titulo"} aponta para outro profileId.`, { profileId: profile.id, planId: plan.id, planProfileId });
+            }
+            if (!plan.folderId) addIntegrityIssue(issues, "warning", `Plano sem folderId: ${plan.title || plan.id || "sem titulo"}.`, { profileId: profile.id, planId: plan.id });
+            if (folderId !== DEFAULT_FOLDER_ID && !folderIds.has(folderId)) {
+              addIntegrityIssue(issues, "warning", `Plano aponta para pasta inexistente: ${plan.title || plan.id || "sem titulo"}.`, { profileId: profile.id, planId: plan.id, folderId });
+            }
+          });
+        });
+
+        if (remoteState) {
+          const localStats = stateStats(checked);
+          const remoteStats = stateStats(remoteState);
+          if (remoteStats.profiles < localStats.profiles) addIntegrityIssue(issues, "error", "Estado remoto tem menos perfis que o local.", { localStats, remoteStats });
+          if (remoteStats.folders < localStats.folders) addIntegrityIssue(issues, "error", "Estado remoto tem menos pastas que o local.", { localStats, remoteStats });
+          if (remoteStats.plans < localStats.plans) addIntegrityIssue(issues, "error", "Estado remoto tem menos planos que o local.", { localStats, remoteStats });
+        }
+        return { checked, issues, stats: stateStats(checked), hasErrors: issues.some(issue => issue.severity === "error") };
+      }
+
+      function isRemoteStateSafeToApply(localState, remoteState) {
+        const remote = remoteState ? normalizeApp(remoteState) : null;
+        const local = localState ? normalizeApp(localState) : null;
+        if (!remote || !Array.isArray(remote.profiles)) return { safe: false, reason: "Estado remoto sem profiles.", diagnostics: null };
+        const remoteDiagnostics = runIntegrityDiagnostics(remote);
+        if (remoteDiagnostics.hasErrors) return { safe: false, reason: "Estado remoto possui conflitos graves.", diagnostics: remoteDiagnostics };
+        const loggedEmail = normalizeEmail(currentUser?.email || "");
+        if (loggedEmail) {
+          const remoteResolvedProfile = resolveCurrentUserProfileSafely(loggedEmail, remote, { silent: true });
+          if (remoteResolvedProfile.conflict) {
+            return { safe: false, reason: `Estado remoto possui conflito no perfil do usuario logado: ${remoteResolvedProfile.reason}`, diagnostics: remoteDiagnostics };
+          }
+        }
+        if (local && Array.isArray(local.profiles) && local.profiles.length) {
+          const localStats = stateStats(local);
+          const remoteStats = stateStats(remote);
+          const remoteHasZeroedProfiles = remoteDiagnostics.issues.some(issue => /perfil zerado/i.test(issue.message || ""));
+          if (!remoteStats.profiles) return { safe: false, reason: "Estado remoto vazio.", diagnostics: remoteDiagnostics };
+          if (localStats.profiles >= 3 && remoteStats.profiles <= localStats.profiles - 2) return { safe: false, reason: "Estado remoto removeu muitos perfis de uma vez.", diagnostics: runIntegrityDiagnostics(local, remote) };
+          if (remoteStats.profiles < localStats.profiles) return { safe: false, reason: "Estado remoto tem menos perfis que o local.", diagnostics: runIntegrityDiagnostics(local, remote) };
+          if (remoteStats.folders < localStats.folders) return { safe: false, reason: "Estado remoto tem menos pastas que o local.", diagnostics: runIntegrityDiagnostics(local, remote) };
+          if (remoteStats.plans < localStats.plans) return { safe: false, reason: "Estado remoto tem menos planos que o local.", diagnostics: runIntegrityDiagnostics(local, remote) };
+          if (remoteHasZeroedProfiles && (localStats.folders || localStats.plans)) return { safe: false, reason: "Estado remoto possui perfis zerados enquanto o local possui dados.", diagnostics: runIntegrityDiagnostics(local, remote) };
+          if (loggedEmail) {
+            const localProfile = local.profiles.find(profile => normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "") === loggedEmail);
+            const remoteProfile = remote.profiles.find(profile => normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "") === loggedEmail);
+            if (localProfile && !remoteProfile) {
+              const localSummary = profileRecoverySummary(localProfile);
+              if (localSummary.folders || localSummary.plans || localSummary.checklists || localSummary.textDocuments) {
+                return { safe: false, reason: "Estado remoto nao possui o perfil do usuario logado que existe localmente.", diagnostics: runIntegrityDiagnostics(local, remote) };
+              }
+            }
+            if (localProfile && remoteProfile) {
+              const localSummary = profileRecoverySummary(localProfile);
+              const remoteSummary = profileRecoverySummary(remoteProfile);
+              if (localProfile.id && remoteProfile.id && String(localProfile.id) !== String(remoteProfile.id) && (localSummary.folders || localSummary.plans || localSummary.checklists || localSummary.textDocuments)) {
+                return { safe: false, reason: "Estado remoto tem perfil do usuario logado com ID diferente e dados locais existentes.", diagnostics: runIntegrityDiagnostics(local, remote) };
+              }
+              if (remoteSummary.folders < localSummary.folders || remoteSummary.plans < localSummary.plans) {
+                return { safe: false, reason: "Estado remoto tem menos dados no perfil do usuario logado.", diagnostics: runIntegrityDiagnostics(local, remote) };
+              }
+            }
+          }
+        }
+        return { safe: true, reason: "", diagnostics: remoteDiagnostics };
+      }
+
+      function recoverySummaryHtml(state, diagnostics = null) {
+        const normalized = state ? normalizeApp(state) : createEmptyApp();
+        const diag = diagnostics || runIntegrityDiagnostics(normalized);
+        const stats = diag.stats;
+        const profileRows = normalized.profiles.map(profileRecoverySummary);
+        const issueClass = issue => issue.severity === "error" ? "danger" : issue.severity === "warning" ? "warning" : "info";
+        return `
+          <div class="recovery-summary-grid">
+            ${managementMetric("Perfis", stats.profiles)}
+            ${managementMetric("Pastas", stats.folders)}
+            ${managementMetric("Planos", stats.plans)}
+            ${managementMetric("Checklists", stats.checklists)}
+            ${managementMetric("Docs de texto", stats.textDocuments)}
+          </div>
+          <div class="management-table-wrap">
+            <table class="management-table">
+              <thead><tr><th>Perfil</th><th>E-mail</th><th>ID</th><th>Pastas</th><th>Planos</th><th>Checklists</th><th>Texto</th></tr></thead>
+              <tbody>${profileRows.map(row => `<tr><td><strong>${escapeHtml(row.name)}</strong></td><td>${escapeHtml(row.email || "-")}</td><td><small>${escapeHtml(row.id || "-")}</small></td><td>${row.folders}</td><td>${row.plans}</td><td>${row.checklists}</td><td>${row.textDocuments}</td></tr>`).join("") || '<tr><td colspan="7"><div class="management-empty">Nenhum perfil encontrado.</div></td></tr>'}</tbody>
+            </table>
+          </div>
+          <div class="recovery-issues">
+            <h3>Conflitos e avisos</h3>
+            ${diag.issues.map(issue => `<div class="recovery-issue ${issueClass(issue)}">${escapeHtml(issue.message)}</div>`).join("") || '<div class="recovery-issue ok">Nenhum conflito grave encontrado.</div>'}
+          </div>`;
+      }
+
+      function renderRecoveryImportPreview(candidate) {
+        const target = document.getElementById("stsRecoveryImportPreview");
+        const applyButton = document.getElementById("stsRecoveryApplyBtn");
+        if (!target || !applyButton) return;
+        if (!candidate) {
+          target.innerHTML = '<div class="management-empty">Selecione um backup JSON para ver a previa antes de aplicar.</div>';
+          applyButton.disabled = true;
+          return;
+        }
+        const hasBlockingErrors = !!candidate.diagnostics?.hasErrors;
+        target.innerHTML = `
+          ${hasBlockingErrors ? `
+            <div class="recovery-issue danger">
+              Este backup possui conflito grave. A restauracao fica bloqueada ate uma confirmacao explicita.
+            </div>
+            <label class="field recovery-risk-confirm">
+              <span class="checkbox-row">
+                <input type="checkbox" id="stsRecoveryRiskConfirm">
+                <span>Entendo os conflitos graves listados e confirmo que este e o backup correto.</span>
+              </span>
+            </label>` : ""}
+          ${recoverySummaryHtml(candidate.state, candidate.diagnostics)}`;
+        applyButton.disabled = hasBlockingErrors;
+        const riskConfirm = target.querySelector("#stsRecoveryRiskConfirm");
+        if (riskConfirm) {
+          riskConfirm.addEventListener("change", () => {
+            applyButton.disabled = !riskConfirm.checked;
+          });
+        }
+      }
+
+      function openRecoveryScreen() {
+        activateRecoveryMode("screen");
+        const localState = readLocalSharedCache() || createEmptyApp();
+        let overlay = document.getElementById("stsRecoveryScreen");
+        if (!overlay) {
+          overlay = document.createElement("section");
+          overlay.id = "stsRecoveryScreen";
+          overlay.className = "sts-recovery-screen";
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          document.body.appendChild(overlay);
+        }
+        overlay.innerHTML = `
+          <div class="sts-recovery-card">
+            <header class="sts-recovery-head">
+              <div><h2>Recuperacao STS</h2><p>Importe um backup JSON com seguranca. O Supabase fica pausado enquanto este modo estiver ativo.</p></div>
+              <button class="button icon-only" type="button" data-recovery-close aria-label="Fechar">x</button>
+            </header>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>Estado local atual</h2><div class="management-item-actions"><button class="button" type="button" data-recovery-self-test>Executar autoteste seguro</button><button class="button" type="button" data-recovery-export-current>Exportar backup completo atual</button></div></div>
+              ${recoverySummaryHtml(localState)}
+            </section>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>Importar backup JSON</h2><div class="management-item-actions"><label class="button primary" for="stsRecoveryFileInput">Selecionar JSON</label><input id="stsRecoveryFileInput" type="file" accept="application/json,.json" hidden></div></div>
+              <div id="stsRecoveryImportPreview"><div class="management-empty">Selecione um backup JSON para ver a previa antes de aplicar.</div></div>
+              <div class="management-item-actions recovery-actions">
+                <button class="button primary" type="button" id="stsRecoveryApplyBtn" data-recovery-apply disabled>Aplicar restauracao validada</button>
+                <button class="button" type="button" data-recovery-reload>Recarregar pagina</button>
+              </div>
+            </section>
+          </div>`;
+        overlay.classList.remove("hidden");
+        recoveryImportCandidate = null;
+        overlay.querySelector("[data-recovery-close]")?.addEventListener("click", () => overlay.classList.add("hidden"));
+        overlay.querySelector("[data-recovery-reload]")?.addEventListener("click", () => window.location.reload());
+        overlay.querySelector("[data-recovery-self-test]")?.addEventListener("click", () => openRecoverySelfTestViewer({ allowAnonymous: true }));
+        overlay.querySelector("[data-recovery-export-current]")?.addEventListener("click", () => downloadCurrentStorageBackup("BACKUP_COMPLETO_ATUAL_STS"));
+        overlay.querySelector("#stsRecoveryFileInput")?.addEventListener("change", handleRecoveryJsonSelected);
+        overlay.querySelector("[data-recovery-apply]")?.addEventListener("click", applyRecoveryImportCandidate);
+      }
+
+      async function openRecoveryStateViewer(kind = "local") {
+        if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+        let title = "Estado local";
+        let state = readLocalSharedCache() || app || createEmptyApp();
+        let updatedAt = readLocalSharedUpdatedAt() || "";
+        if (kind === "remote") {
+          title = "Estado remoto Supabase";
+          if (!supabaseClient || isRecoveryModeActive()) {
+            showToast("Supabase indisponivel ou pausado pelo modo recuperacao.", "warning", 7000);
+            state = null;
+            updatedAt = "";
+          } else {
+            try {
+              const row = await fetchSharedStateFull({ source: "management-recovery-state" });
+              state = row?.data ? normalizeApp(row.data) : null;
+              updatedAt = row?.updated_at || "";
+            } catch (error) {
+              console.warn(error);
+              showToast("Nao foi possivel consultar o estado remoto.", "danger", 7000);
+              state = null;
+            }
+          }
+        }
+        if (kind === "conflicts") title = "Conflitos de usuarios";
+        const localState = readLocalSharedCache() || app || createEmptyApp();
+        const diagnostics = state ? runIntegrityDiagnostics(state) : { issues: [{ severity: "error", message: "Estado nao encontrado.", context: {} }], stats: stateStats(createEmptyApp()), hasErrors: true };
+        const comparison = kind === "remote" && state ? runIntegrityDiagnostics(localState, state) : null;
+        const displayDiagnostics = comparison
+          ? { ...diagnostics, issues: [...diagnostics.issues, ...comparison.issues.filter(issue => /remoto/i.test(issue.message || ""))], hasErrors: diagnostics.hasErrors || comparison.hasErrors }
+          : diagnostics;
+        let overlay = document.getElementById("stsRecoveryStateViewer");
+        if (!overlay) {
+          overlay = document.createElement("section");
+          overlay.id = "stsRecoveryStateViewer";
+          overlay.className = "sts-recovery-screen";
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          document.body.appendChild(overlay);
+        }
+        const summaryPayload = state ? {
+          updatedAt,
+          stats: stateStats(state),
+          issues: displayDiagnostics.issues,
+          profiles: (state.profiles || []).map(profileRecoverySummary)
+        } : { updatedAt, stats: {}, issues: diagnostics.issues, profiles: [] };
+        overlay.innerHTML = `
+          <div class="sts-recovery-card">
+            <header class="sts-recovery-head">
+              <div><h2>${escapeHtml(title)}</h2><p>Consulta segura para diagnostico. Nenhum dado e alterado nesta tela.</p></div>
+              <button class="button icon-only" type="button" data-recovery-state-close aria-label="Fechar">x</button>
+            </header>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>Resumo</h2><span class="management-status-badge">${escapeHtml(updatedAt || "sem data")}</span></div>
+              ${state ? recoverySummaryHtml(state, displayDiagnostics) : '<div class="management-empty">Estado nao encontrado.</div>'}
+            </section>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>JSON de diagnostico</h2></div>
+              <pre class="management-json-preview">${escapeHtml(JSON.stringify(summaryPayload, null, 2))}</pre>
+            </section>
+          </div>`;
+        overlay.classList.remove("hidden");
+        overlay.querySelector("[data-recovery-state-close]")?.addEventListener("click", () => overlay.classList.add("hidden"));
+      }
+
+      function recoverySelfTestState() {
+        return normalizeApp({
+          profiles: [
+            {
+              id: "selftest-abner",
+              name: "Abner",
+              email: "abner.l@outlook.com",
+              folders: [createDefaultFolder(), { id: "selftest-folder-abner", name: "ACADEMIA FORCE ONE" }],
+              plans: [{ id: "selftest-plan-abner", title: "Plano Abner", folderId: "selftest-folder-abner", data: createPlanData({ company: "Abner", documentType: "PGR" }) }],
+              documents: []
+            },
+            {
+              id: "selftest-layanne",
+              name: "Layanne",
+              email: "segurancadotrabalho@protege.med.br",
+              folders: [createDefaultFolder(), { id: "selftest-folder-layanne", name: "Belterra" }],
+              plans: [{ id: "selftest-plan-layanne", title: "Plano Layanne", folderId: "selftest-folder-layanne", data: createPlanData({ company: "Layanne", documentType: "PGR" }) }],
+              documents: []
+            }
+          ],
+          view: "profiles",
+          activeProfileId: null,
+          activeFolderId: DEFAULT_FOLDER_ID,
+          activePlanId: null
+        });
+      }
+
+      function runRecoverySelfTests() {
+        const goodLocal = recoverySelfTestState();
+        const tests = [];
+        const add = (name, passed, detail = "") => tests.push({ name, passed: !!passed, detail });
+        const hasIssue = (diagnostics, text) => diagnostics.issues.some(issue => normalizeText(issue.message || "").includes(normalizeText(text)));
+
+        const duplicateIdState = normalizeApp({
+          profiles: [
+            { ...goodLocal.profiles[0], id: "duplicated-selftest-id" },
+            { ...goodLocal.profiles[1], id: "duplicated-selftest-id" }
+          ]
+        });
+        const duplicateDiagnostics = runIntegrityDiagnostics(duplicateIdState);
+        add("Detecta Abner/Layanne com mesmo ID", duplicateDiagnostics.hasErrors && hasIssue(duplicateDiagnostics, "mesmo ID"), duplicateDiagnostics.issues.map(issue => issue.message).join(" | "));
+
+        const nameEmailState = normalizeApp({
+          profiles: [{ ...goodLocal.profiles[0], id: "selftest-mismatch", name: "Layanne", email: "abner.l@outlook.com" }]
+        });
+        const nameEmailDiagnostics = runIntegrityDiagnostics(nameEmailState);
+        add("Detecta nome/e-mail incompatíveis", nameEmailDiagnostics.hasErrors && hasIssue(nameEmailDiagnostics, "Nome/e-mail incompat"), nameEmailDiagnostics.issues.map(issue => issue.message).join(" | "));
+
+        const nameEmailResolver = resolveCurrentUserProfileSafely("abner.l@outlook.com", nameEmailState, { silent: true });
+        add("Bloqueia associacao Layanne/e-mail Abner no login", !nameEmailResolver.found && nameEmailResolver.conflict, nameEmailResolver.reason || nameEmailResolver.source);
+
+        const previousCurrentUser = currentUser;
+        const foreignUserIdState = normalizeApp({
+          profiles: [{ ...goodLocal.profiles[0], id: "selftest-foreign-userid", userId: "selftest-foreign-user", email: "abner.l@outlook.com" }]
+        });
+        let foreignUserResolver = { found: true, conflict: false, reason: "Autoteste nao retornou resultado." };
+        let foreignRemoteSafety = { safe: true, reason: "Autoteste nao retornou resultado." };
+        try {
+          currentUser = { id: "selftest-abner-auth-user", email: "abner.l@outlook.com" };
+          foreignUserResolver = resolveCurrentUserProfileSafely("abner.l@outlook.com", foreignUserIdState, { silent: true });
+          foreignRemoteSafety = isRemoteStateSafeToApply(goodLocal, foreignUserIdState);
+        } finally {
+          currentUser = previousCurrentUser;
+        }
+        add("Bloqueia e-mail correto com userId de outro usuario", !foreignUserResolver.found && foreignUserResolver.conflict, foreignUserResolver.reason || foreignUserResolver.source);
+        add("Recusa remoto com e-mail correto e userId estrangeiro", !foreignRemoteSafety.safe, foreignRemoteSafety.reason);
+
+        const emptyRemoteSafety = isRemoteStateSafeToApply(goodLocal, { profiles: [] });
+        add("Recusa remoto vazio", !emptyRemoteSafety.safe, emptyRemoteSafety.reason);
+
+        const absentRemoteSafety = isRemoteStateSafeToApply(goodLocal, null);
+        add("Recusa remoto ausente", !absentRemoteSafety.safe, absentRemoteSafety.reason);
+
+        const smallerRemoteSafety = isRemoteStateSafeToApply(goodLocal, { profiles: [goodLocal.profiles[1]] });
+        add("Recusa remoto menor que local", !smallerRemoteSafety.safe, smallerRemoteSafety.reason);
+
+        const exactProfile = resolveCurrentUserProfileSafely("abner.l@outlook.com", goodLocal, { silent: true });
+        add("Resolve perfil por e-mail exato", exactProfile.found && exactProfile.profileId === "selftest-abner", exactProfile.reason || exactProfile.source);
+
+        const missingProfile = resolveCurrentUserProfileSafely("semperfil@example.com", goodLocal, { silent: true });
+        add("Não usa primeiro perfil quando e-mail não existe", !missingProfile.found && !missingProfile.conflict, missingProfile.reason);
+
+        const wrappedBackup = { localStorage: { [SHARED_STORAGE_KEY]: JSON.stringify(goodLocal) } };
+        const extracted = extractSharedStateFromBackup(wrappedBackup);
+        add("Extrai estrutura de planoDeAcaoSST.shared.v1", Array.isArray(extracted?.profiles) && extracted.profiles.length === 2, `Perfis extraidos: ${extracted?.profiles?.length || 0}`);
+
+        const dirtyNavigationBackup = {
+          ...goodLocal,
+          view: "editor",
+          activeProfileId: "perfil-corrompido",
+          activeFolderId: "pasta-inexistente",
+          activePlanId: "plano-inexistente"
+        };
+        const preparedRestore = prepareRecoveryRestoredState(dirtyNavigationBackup);
+        add(
+          "Restaura resetando navegacao sem perder dados",
+          preparedRestore.view === "profiles"
+            && preparedRestore.activeProfileId === null
+            && preparedRestore.activeFolderId === DEFAULT_FOLDER_ID
+            && preparedRestore.activePlanId === null
+            && preparedRestore.profiles.length === goodLocal.profiles.length
+            && stateStats(preparedRestore).plans === stateStats(goodLocal).plans,
+          JSON.stringify({ view: preparedRestore.view, profiles: preparedRestore.profiles.length, plans: stateStats(preparedRestore).plans })
+        );
+
+        const cleanDiagnostics = runIntegrityDiagnostics(goodLocal);
+        add("Backup sintético consistente não tem erro grave", !cleanDiagnostics.hasErrors, cleanDiagnostics.issues.map(issue => issue.message).join(" | "));
+
+        return {
+          createdAt: new Date().toISOString(),
+          passed: tests.every(test => test.passed),
+          total: tests.length,
+          passedCount: tests.filter(test => test.passed).length,
+          tests
+        };
+      }
+
+      function openRecoverySelfTestViewer(options = {}) {
+        const canRunSelfTest = options.allowAnonymous || isRecoveryModeActive() || normalizeEmail(currentUser?.email || "") === SUPER_ADMIN_EMAIL;
+        if (!canRunSelfTest) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+        const result = runRecoverySelfTests();
+        let overlay = document.getElementById("stsRecoverySelfTestViewer");
+        if (!overlay) {
+          overlay = document.createElement("section");
+          overlay.id = "stsRecoverySelfTestViewer";
+          overlay.className = "sts-recovery-screen";
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          document.body.appendChild(overlay);
+        }
+        overlay.innerHTML = `
+          <div class="sts-recovery-card">
+            <header class="sts-recovery-head">
+              <div><h2>Autoteste de recuperacao STS</h2><p>Testes sintéticos somente leitura. Nenhum dado local ou remoto é alterado.</p></div>
+              <button class="button icon-only" type="button" data-recovery-selftest-close aria-label="Fechar">x</button>
+            </header>
+            <section class="management-panel">
+              <div class="management-panel-head">
+                <h2>Resultado</h2>
+                <span class="management-status-badge">${result.passed ? "Aprovado" : "Verificar"}</span>
+              </div>
+              <div class="management-dashboard-grid">
+                ${managementMetric("Testes", result.total)}
+                ${managementMetric("Aprovados", result.passedCount)}
+                ${managementMetric("Status", result.passed ? "OK" : "Atenção")}
+              </div>
+              <div class="management-table-wrap">
+                <table class="management-table">
+                  <thead><tr><th>Teste</th><th>Status</th><th>Detalhe</th></tr></thead>
+                  <tbody>${result.tests.map(test => `<tr><td><strong>${escapeHtml(test.name)}</strong></td><td>${test.passed ? "OK" : "Falhou"}</td><td>${escapeHtml(test.detail || "-")}</td></tr>`).join("")}</tbody>
+                </table>
+              </div>
+            </section>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>JSON do autoteste</h2></div>
+              <pre class="management-json-preview">${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+            </section>
+          </div>`;
+        overlay.classList.remove("hidden");
+        overlay.querySelector("[data-recovery-selftest-close]")?.addEventListener("click", () => overlay.classList.add("hidden"));
+      }
+
+      function handleRecoveryJsonSelected(event) {
+        const file = event.target.files && event.target.files[0];
+        recoveryImportCandidate = null;
+        if (!file) return renderRecoveryImportPreview(null);
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const raw = JSON.parse(reader.result);
+            const state = extractSharedStateFromBackup(raw);
+            if (!state || !Array.isArray(state.profiles)) {
+              showToast("Backup invalido: nao encontrei profiles nem planoDeAcaoSST.shared.v1.", "danger", 6000);
+              return renderRecoveryImportPreview(null);
+            }
+            const diagnostics = runIntegrityDiagnostics(state);
+            recoveryImportCandidate = { raw, state, diagnostics, fileName: file.name };
+            recordActivity("Importou backup", `Arquivo de recuperacao analisado: ${file.name}.`);
+            recordActivity("Importou backup de recuperacao", `Arquivo analisado: ${file.name}.`);
+            renderRecoveryImportPreview(recoveryImportCandidate);
+          } catch (error) {
+            console.error(error);
+            showToast("Nao foi possivel ler o JSON selecionado.", "danger", 6000);
+            renderRecoveryImportPreview(null);
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      }
+
+      function clearRecoveryTemporaryKeys() {
+        Object.keys(localStorage).forEach(key => {
+          if (key === LOCAL_MIGRATION_KEY || key.startsWith(`${LOCAL_MIGRATION_KEY}.`)) localStorage.removeItem(key);
+          if (["activeProfileId", "activeFolderId", "activePlanId"].includes(key)) localStorage.removeItem(key);
+        });
+      }
+
+      function prepareRecoveryRestoredState(state) {
+        const restored = normalizeApp(state || createEmptyApp());
+        restored.view = "profiles";
+        restored.activeProfileId = null;
+        restored.activeFolderId = DEFAULT_FOLDER_ID;
+        restored.activePlanId = null;
+        return restored;
+      }
+
+      async function applyRecoveryImportCandidate() {
+        if (!recoveryImportCandidate?.state) return showToast("Selecione um backup valido antes de restaurar.", "warning");
+        const diagnostics = recoveryImportCandidate.diagnostics || runIntegrityDiagnostics(recoveryImportCandidate.state);
+        const riskConfirm = document.getElementById("stsRecoveryRiskConfirm");
+        if (diagnostics.hasErrors && !riskConfirm?.checked) {
+          return showToast("Confirme explicitamente os conflitos graves antes de aplicar este backup.", "danger", 7000);
+        }
+        const requiredText = diagnostics.hasErrors ? "RESTAURAR COM CONFLITOS" : "RESTAURAR";
+        const message = diagnostics.hasErrors
+          ? "Foram detectados conflitos graves. A restauracao so deve continuar se voce tiver certeza de que este e o backup correto."
+          : "O estado atual sera preservado em um backup automatico antes da restauracao.";
+        if (!await openConfirmModal({ title: "Aplicar restauracao STS", message, requiredText, confirmLabel: "Aplicar restauracao", tone: diagnostics.hasErrors ? "danger" : "primary" })) return;
+        downloadCurrentStorageBackup();
+        const restored = prepareRecoveryRestoredState(recoveryImportCandidate.state);
+        const now = new Date().toISOString();
+        localStorage.setItem(SHARED_STORAGE_KEY, JSON.stringify(restored));
+        localStorage.setItem(SHARED_UPDATED_AT_CACHE_KEY, now);
+        clearRecoveryTemporaryKeys();
+        app = restored;
+        lastSharedUpdatedAt = now;
+        selectedActions.clear();
+        cloudReady = false;
+        stopSharedSync();
+        recordActivity("Aplicou restauracao", `Backup restaurado: ${recoveryImportCandidate.fileName || "arquivo JSON"}.`);
+        renderApp();
+        renderRecoveryBanner("Restauracao aplicada localmente. Recarregue e confira os perfis antes de religar o Supabase.");
+        showToast("Restauracao aplicada no localStorage. Recarregue a pagina para conferir.", "success", 8000);
+        setTimeout(() => window.location.reload(), 1800);
+      }
+
       async function handleSwitchUserLogin(event) {
         event.preventDefault();
         if (!supabaseClient) return setSwitchUserMessage("Supabase não carregou. Atualize a página.", "error");
@@ -1796,6 +3164,8 @@
       }
 
       async function logout() {
+        profileConflictActive = false;
+        setProfileConflictReadOnlyMode(false);
         const ownProfile = updateOwnLastAccess();
         recordActivity("Saiu do sistema", "Logout realizado pelo usuário.");
         if (ownProfile) saveApp({ profileId: ownProfile.id });
@@ -1828,6 +3198,11 @@
       async function loadAppFromCloud(user) {
         const localCache = readLocalSharedCache();
         const cachedUpdatedAt = readLocalSharedUpdatedAt();
+        if (isRecoveryModeActive()) {
+          egressDiag("loadAppFromCloud bloqueada por modo recuperacao", { hasLocalCache: !!localCache });
+          renderRecoveryBanner();
+          return localCache || createEmptyApp();
+        }
         const migrationDone = isRestrictedAdminUser(user) || !!localStorage.getItem(`${LOCAL_MIGRATION_KEY}.${user.id}`);
         egressDiag("loadAppFromCloud chamada", {
           hasLocalCache: !!localCache,
@@ -1846,28 +3221,34 @@
           const row = await fetchSharedStateFull({ source: "loadAppFromCloud", throwOnError: true });
           if (row && row.data) {
             lastSharedUpdatedAt = row.updated_at || "";
-            const merged = await mergeLocalCacheIntoCloud(normalizeApp(row.data), localCache);
+            const remote = normalizeApp(row.data);
+            const safety = isRemoteStateSafeToApply(localCache, remote);
+            if (!safety.safe) {
+              console.warn("[STS] Estado remoto recusado:", safety.reason, safety.diagnostics);
+              recordActivity("Recusou estado remoto corrompido", safety.reason);
+              renderRecoveryBanner(`Sincronizacao pausada: ${safety.reason}`);
+              showToast(`Sincronizacao pausada: ${safety.reason}`, "warning", 7000);
+              return localCache || createEmptyApp();
+            }
+            const merged = await mergeLocalCacheIntoCloud(remote, localCache);
             writeLocalSharedCache(merged, lastSharedUpdatedAt);
             return merged;
           }
           throw new Error("Linha shared_states/main não retornou data.");
         }
 
-        const initial = createEmptyApp();
-        const { data: created, error: createError } = await supabaseClient
-          .from("shared_states")
-          .upsert({
-            id: SHARED_STATE_ID,
-            data: initial,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "id" })
-          .select("updated_at")
-          .single();
-        if (createError) throw createError;
-        lastSharedUpdatedAt = created && created.updated_at ? created.updated_at : "";
-        const merged = await mergeLocalCacheIntoCloud(normalizeApp(initial), localCache);
-        writeLocalSharedCache(merged, lastSharedUpdatedAt);
-        return merged;
+        if (localCache && Array.isArray(localCache.profiles) && localCache.profiles.length) {
+          egressDiag("loadAppFromCloud manteve cache local; remoto ausente", { profiles: localCache.profiles.length });
+          recordActivity("Supabase indisponivel", "Linha remota ausente; usando cache local protegido.");
+          showToast("Supabase indisponivel. Usando dados locais em modo protegido.", "warning", 7000);
+          return localCache;
+        }
+
+        egressDiag("loadAppFromCloud remoto ausente sem cache local; nao criou estado vazio", { userId: user?.id || "" });
+        recordActivity("Supabase indisponivel", "Linha remota ausente e sem cache local; evitando criar estado remoto vazio automaticamente.");
+        renderRecoveryBanner("Supabase indisponivel ou sem estado compartilhado. O STS abriu em modo local protegido para evitar sobrescrever dados.");
+        showToast("Supabase sem estado compartilhado. Abrindo localmente sem criar base vazia.", "warning", 8000);
+        return createEmptyApp();
       }
 
       function readLocalSharedCache() {
@@ -1894,6 +3275,12 @@
         if (!currentUser || isRestrictedAdminUser() || !localApp || !Array.isArray(localApp.profiles) || !localApp.profiles.length) return cloudApp;
         const migrationKey = `${LOCAL_MIGRATION_KEY}.${currentUser.id}`;
         if (localStorage.getItem(migrationKey)) return cloudApp;
+        const localDiagnostics = runIntegrityDiagnostics(localApp);
+        if (localDiagnostics.hasErrors) {
+          recordActivity("Recusou estado remoto corrompido", "Migração local para Supabase bloqueada porque o cache local possui conflito grave.");
+          renderRecoveryBanner("Migracao local para Supabase pausada: o cache local possui conflito grave.");
+          return cloudApp;
+        }
 
         const merged = normalizeApp(cloudApp);
         let changed = false;
@@ -1910,7 +3297,6 @@
           const profileEmail = normalizeText(profile.email || "");
           if (!profile.userId && profileEmail && profileEmail === currentEmail) {
             profile.userId = currentUser.id;
-            profile.id = currentUser.id;
           }
           if (profile.userId && merged.hiddenUserProfileIds.includes(profile.userId)) return;
           const existing = merged.profiles.find(item => {
@@ -1954,6 +3340,13 @@
           return merged;
         }
 
+        const mergedDiagnostics = runIntegrityDiagnostics(merged);
+        if (mergedDiagnostics.hasErrors) {
+          recordActivity("Recusou estado remoto corrompido", "Migração local para Supabase bloqueada porque o estado mesclado possui conflito grave.");
+          renderRecoveryBanner("Migracao local para Supabase pausada: o estado mesclado possui conflito grave.");
+          return cloudApp;
+        }
+
         egressDiag("mergeLocalCacheIntoCloud enviando migração local", { changed });
         const { data, error } = await supabaseClient
           .from("shared_states")
@@ -1975,42 +3368,207 @@
         return normalized;
       }
 
+      function resolveCurrentUserProfileSafely(currentUserEmail, state = app, options = {}) {
+        const email = normalizeEmail(currentUserEmail || currentUser?.email || "");
+        const userId = String(currentUser?.id || "");
+        const profiles = Array.isArray(state?.profiles) ? state.profiles.filter(profile => profile && !profile.hidden) : [];
+        const repairedUserId = (!options.silent && state === app)
+          ? repairDuplicateLoggedUserId(state, email, userId)
+          : { changed: false, keptProfile: null, repairedProfiles: [] };
+        const byUserId = userId ? profiles.filter(profile => profile.userId && String(profile.userId) === userId) : [];
+        const logConflict = message => {
+          if (!options.silent) recordActivity("Conflito de perfil detectado", message);
+        };
+        if (byUserId.length === 1) {
+          const reason = protectedProfileIdentityConflict(byUserId[0], email, userId);
+          if (reason) {
+            logConflict(reason);
+            return { found: false, conflict: true, profiles: byUserId, reason };
+          }
+          return { found: true, profile: byUserId[0], profileId: byUserId[0].id, source: "userId" };
+        }
+        if (byUserId.length > 1) {
+          const exactEmailAmongUserId = email
+            ? byUserId.filter(profile => normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "") === email)
+            : [];
+          if (exactEmailAmongUserId.length === 1) {
+            const reason = protectedProfileIdentityConflict(exactEmailAmongUserId[0], email, userId);
+            if (reason) {
+              logConflict(reason);
+              return { found: false, conflict: true, profiles: byUserId, reason };
+            }
+            logConflict(`UserId duplicado detectado, mas o perfil com e-mail exato foi usado sem alterar os demais: ${email}.`);
+            return { found: true, profile: exactEmailAmongUserId[0], profileId: exactEmailAmongUserId[0].id, source: "userId-email-exact", warning: "Mais de um perfil possui o mesmo userId, mas apenas um corresponde ao e-mail logado." };
+          }
+          if (exactEmailAmongUserId.length > 1) {
+            logConflict(`Mais de um perfil com o userId e e-mail do usuario logado: ${email}.`);
+            return { found: false, conflict: true, profiles: exactEmailAmongUserId, reason: "Mais de um perfil possui o mesmo userId e e-mail do usuario logado." };
+          }
+          logConflict(`Mais de um perfil com o userId do usuario logado: ${email}.`);
+          return { found: false, conflict: true, profiles: byUserId, reason: "Mais de um perfil possui o mesmo userId do usuario logado." };
+        }
+        if (repairedUserId.changed && repairedUserId.keptProfile) {
+          return { found: true, profile: repairedUserId.keptProfile, profileId: repairedUserId.keptProfile.id, source: "userId-repaired", repaired: true };
+        }
+        const byEmail = email ? profiles.filter(profile => normalizeEmail(profile.email || profile.userEmail || profile.ownerEmail || profile.createdBy || "") === email) : [];
+        if (byEmail.length === 1) {
+          const reason = protectedProfileIdentityConflict(byEmail[0], email, userId);
+          if (reason) {
+            logConflict(reason);
+            return { found: false, conflict: true, profiles: byEmail, reason };
+          }
+          return { found: true, profile: byEmail[0], profileId: byEmail[0].id, source: "email" };
+        }
+        if (byEmail.length > 1) {
+          logConflict(`Mais de um perfil com o e-mail ${email}.`);
+          return { found: false, conflict: true, profiles: byEmail, reason: "Mais de um perfil possui o e-mail do usuario logado." };
+        }
+        return { found: false, profile: null, profileId: "", source: "", reason: "Nenhum perfil vinculado por userId ou e-mail ao usuario logado." };
+      }
+
+      function profileConflictRowsHtml(profiles = []) {
+        return profiles.map(profile => {
+          const summary = profileRecoverySummary(profile);
+          return `<tr>
+            <td><strong>${escapeHtml(summary.name)}</strong></td>
+            <td>${escapeHtml(summary.email || "-")}</td>
+            <td><small>${escapeHtml(summary.id || "-")}</small></td>
+            <td>${summary.folders}</td>
+            <td>${summary.plans}</td>
+            <td>${summary.checklists}</td>
+            <td>${summary.textDocuments}</td>
+          </tr>`;
+        }).join("") || '<tr><td colspan="7"><div class="management-empty">Nenhum perfil candidato seguro encontrado.</div></td></tr>';
+      }
+
+      function openProfileConflictScreen(resolved = {}) {
+        profileConflictActive = true;
+        stopSharedSync();
+        cloudReady = false;
+        renderRecoveryBanner(resolved.reason || "Conflito de perfil detectado. A sincronizacao foi pausada para proteger os dados locais.");
+        let overlay = document.getElementById("stsProfileConflictScreen");
+        if (!overlay) {
+          overlay = document.createElement("section");
+          overlay.id = "stsProfileConflictScreen";
+          overlay.className = "sts-recovery-screen profile-conflict-screen";
+          overlay.setAttribute("role", "dialog");
+          overlay.setAttribute("aria-modal", "true");
+          document.body.appendChild(overlay);
+        }
+        const candidates = Array.isArray(resolved.profiles) ? resolved.profiles : [];
+        overlay.innerHTML = `
+          <div class="sts-recovery-card">
+            <header class="sts-recovery-head">
+              <div>
+                <h2>Conflito de perfil detectado</h2>
+                <p>O STS nao vai vincular automaticamente outro perfil ao e-mail logado.</p>
+              </div>
+              <button class="button icon-only" type="button" data-profile-conflict-close aria-label="Fechar">x</button>
+            </header>
+            <section class="management-panel">
+              <div class="management-panel-head">
+                <div><h2>E-mail logado</h2><p>${escapeHtml(currentUser?.email || "-")}</p></div>
+                <span class="management-status-badge">Associacao bloqueada</span>
+              </div>
+              <p>${escapeHtml(resolved.reason || "Nenhum perfil seguro foi encontrado para este usuario.")}</p>
+              <div class="management-table-wrap">
+                <table class="management-table">
+                  <thead><tr><th>Perfil</th><th>E-mail</th><th>ID</th><th>Pastas</th><th>Planos</th><th>Checklists</th><th>Texto</th></tr></thead>
+                  <tbody>${profileConflictRowsHtml(candidates)}</tbody>
+                </table>
+              </div>
+            </section>
+            <section class="management-panel">
+              <div class="management-panel-head"><h2>O que deseja fazer?</h2></div>
+              <div class="management-item-actions">
+                <button class="button" type="button" data-profile-conflict-readonly>Entrar em modo somente leitura</button>
+                <button class="button primary" type="button" data-profile-conflict-create>Criar novo perfil vazio</button>
+                <button class="button" type="button" data-profile-conflict-recovery>Abrir recuperacao STS</button>
+                <button class="button danger" type="button" data-profile-conflict-cancel>Cancelar login</button>
+              </div>
+            </section>
+          </div>`;
+        overlay.classList.remove("hidden");
+        overlay.querySelector("[data-profile-conflict-close]")?.addEventListener("click", () => overlay.classList.add("hidden"));
+        overlay.querySelector("[data-profile-conflict-readonly]")?.addEventListener("click", () => {
+          setProfileConflictReadOnlyMode(true);
+          renderRecoveryBanner("Modo somente leitura por conflito de perfil. Nenhuma alteracao sera salva ate recarregar ou resolver.");
+          showToast("Modo somente leitura ativado para proteger os dados.", "warning", 7000);
+          overlay.classList.add("hidden");
+        });
+        overlay.querySelector("[data-profile-conflict-create]")?.addEventListener("click", () => {
+          const profile = createEmptyCurrentUserProfileSafely();
+          if (!profile) return;
+          profileConflictActive = false;
+          setProfileConflictReadOnlyMode(false);
+          overlay.classList.add("hidden");
+          showToast("Perfil vazio criado sem alterar perfis existentes.", "success", 7000);
+          renderApp();
+        });
+        overlay.querySelector("[data-profile-conflict-recovery]")?.addEventListener("click", openRecoveryScreen);
+        overlay.querySelector("[data-profile-conflict-cancel]")?.addEventListener("click", logout);
+      }
+
+      function createEmptyCurrentUserProfileSafely() {
+        if (!currentUser) return null;
+        const resolved = resolveCurrentUserProfileSafely(currentUser.email || "", app);
+        if (resolved.found) return resolved.profile;
+        const now = new Date().toISOString();
+        let id = currentUser.id || createId();
+        if (app.profiles.some(profile => String(profile.id || "") === String(id))) id = createId();
+        const profile = normalizeProfile({
+          id,
+          userId: currentUser.id || "",
+          name: currentUser.email ? currentUser.email.split("@")[0] : "Meu perfil",
+          role: "",
+          company: "",
+          email: currentUser.email || "",
+          avatarColor: pickColor(currentUser.email || currentUser.id || id),
+          avatarPhoto: "",
+          createdAt: now,
+          lastAccess: now,
+          folders: [createDefaultFolder()],
+          plans: []
+        });
+        downloadCurrentStorageBackup("BACKUP_ANTES_DE_CRIAR_PERFIL_STS");
+        app.profiles.push(profile);
+        app.activeProfileId = profile.id;
+        app.activeFolderId = DEFAULT_FOLDER_ID;
+        app.activePlanId = null;
+        app.view = "folders";
+        dirtyProfileIds.add(profile.id);
+        recordActivity("Tentativa bloqueada de associar perfil errado", "Usuario optou por criar perfil vazio seguro; perfis existentes foram preservados.");
+        saveApp({ profileId: profile.id });
+        return profile;
+      }
+
       function ensureSinglePrivateProfile() {
         if (!currentUser) return null;
         if (isRestrictedAdminUser()) return null;
         if (app.hiddenUserProfileIds.includes(currentUser.id)) return null;
-        const userEmail = normalizeText(currentUser.email || "");
-        let profile = app.profiles.find(item => item.userId === currentUser.id)
-          || app.profiles.find(item => item.id === currentUser.id)
-          || app.profiles.find(item => userEmail && normalizeText(item.email || "") === userEmail);
+        const resolved = resolveCurrentUserProfileSafely(currentUser.email || "", app);
+        let profile = resolved.found ? resolved.profile : null;
+        if (resolved.conflict) {
+          showToast("Conflito de perfil detectado. O STS bloqueou a associacao automatica.", "danger", 8000);
+          openProfileConflictScreen(resolved);
+          return null;
+        }
 
         if (!profile) {
-          profile = normalizeProfile({
-            id: currentUser.id,
-            userId: currentUser.id,
-            name: currentUser.email ? currentUser.email.split("@")[0] : "Meu perfil",
-            role: "",
-            company: "",
-            email: currentUser.email || "",
-            avatarColor: pickColor(currentUser.email || currentUser.id),
-            avatarPhoto: "",
-            createdAt: new Date().toISOString(),
-            lastAccess: "",
-            folders: [createDefaultFolder()],
-            plans: []
-          });
-          app.profiles.push(profile);
-          dirtyProfileIds.add(profile.id);
+          recordActivity("Tentativa bloqueada de associar perfil errado", resolved.reason || "Nenhum perfil seguro encontrado; aguardando escolha manual.");
+          showToast("Nao encontrei perfil vinculado com seguranca. Escolha uma opcao na tela de conflito.", "warning", 7000);
+          openProfileConflictScreen(resolved);
+          return null;
         } else {
-          Object.assign(profile, normalizeProfile({
-            ...profile,
-            userId: currentUser.id,
-            email: currentUser.email || profile.email || ""
-          }));
+          if (!profile.userId && currentUser.id) {
+            profile.userId = currentUser.id;
+            dirtyProfileIds.add(profile.id);
+          }
         }
 
         ensureDefaultFolder(profile);
         if (!app.activeFolderId) app.activeFolderId = DEFAULT_FOLDER_ID;
+        if (resolved.repaired) saveApp({ profileId: profile.id, fullSave: true });
         return profile;
       }
 
@@ -2099,6 +3657,7 @@
           avatar_photo: profile.avatarPhoto || "",
           updated_at: new Date().toISOString()
         };
+        cacheProfileAvatar(currentUser, profile);
         egressDiag("user_profiles upsert próprio perfil", { source: "syncOwnPublicProfile", userId: currentUser.id });
         const { error } = await supabaseClient
           .from("user_profiles")
@@ -2133,6 +3692,7 @@
           avatar_photo: profile.avatarPhoto || "",
           updated_at: new Date().toISOString()
         };
+        cacheProfileAvatar(currentUser, profile);
         if (existing && publicProfileRowMatches(existing, row)) {
           egressDiag("publishOwnProfileIfNeeded pulou upsert sem alteração", { userId: currentUser.id });
           return profile;
@@ -2151,7 +3711,7 @@
         return {
           id: DEFAULT_ACTION_PLAN_TEMPLATE_ID,
           name: "Template padrão",
-          description: "Modelo padrão do SATS para novos planos de ação.",
+          description: "Modelo padrão do STS para novos planos de ação.",
           category: "Geral",
           type: "mixed",
           active: true,
@@ -2162,8 +3722,8 @@
           trainingRows: data.trainings,
           createdAt: now,
           updatedAt: now,
-          createdBy: "SATS",
-          updatedBy: "SATS"
+          createdBy: "STS",
+          updatedBy: "STS"
         };
       }
 
@@ -2269,7 +3829,7 @@
 
       function createDefaultSystemSettings() {
         return {
-          branding: { appName: "SATS", subtitle: "", logoDataUrl: "", accentColor: "#2563eb" },
+          branding: { appName: "STS", subtitle: "Suporte Técnico de Segurança", logoDataUrl: "", accentColor: "#0b8fff" },
           maintenance: { enabled: false, message: "Sistema em manutenção. Tente novamente mais tarde.", allowedEmails: [SUPER_ADMIN_EMAIL] },
           security: { requireAdminModeForHiddenItems: true, allowClientPortal: false },
           exports: { defaultFormat: "pdf", includeLogo: true, includeRevision: true },
@@ -2297,7 +3857,7 @@
       function normalizeBackupCenter(raw = {}) {
         const maxSnapshots = Math.max(1, Number(raw.settings?.maxSnapshots) || MAX_INTERNAL_BACKUPS);
         return {
-          snapshots: (Array.isArray(raw.snapshots) ? raw.snapshots : []).map(snapshot => ({ id: snapshot.id || createId(), type: snapshot.type || "full", label: String(snapshot.label || "Backup SATS"), createdAt: snapshot.createdAt || new Date().toISOString(), createdBy: String(snapshot.createdBy || ""), clientId: String(snapshot.clientId || ""), profileId: String(snapshot.profileId || ""), planId: String(snapshot.planId || ""), size: Number(snapshot.size) || 0, data: snapshot.data || {} })).slice(0, maxSnapshots),
+          snapshots: (Array.isArray(raw.snapshots) ? raw.snapshots : []).map(snapshot => ({ id: snapshot.id || createId(), type: snapshot.type || "full", label: String(snapshot.label || "Backup STS"), createdAt: snapshot.createdAt || new Date().toISOString(), createdBy: String(snapshot.createdBy || ""), clientId: String(snapshot.clientId || ""), profileId: String(snapshot.profileId || ""), planId: String(snapshot.planId || ""), size: Number(snapshot.size) || 0, data: snapshot.data || {} })).slice(0, maxSnapshots),
           settings: { autoBackupBeforeDestructiveAction: raw.settings?.autoBackupBeforeDestructiveAction !== false, maxSnapshots }
         };
       }
@@ -2343,6 +3903,9 @@
           activityLog: [],
           improvementSuggestions: [],
           suggestionNotifications: [],
+          crewMessages: [],
+          copyRequests: [],
+          crewCopyRequests: [],
           suggestionWeeklyRanking: normalizeSuggestionWeeklyRanking(),
           managementPermissions: { users: [] },
           procedureLibrary: createDefaultProcedureLibrary(),
@@ -2367,6 +3930,14 @@
           activityLog: normalizeActivityLog(raw.activityLog || raw.activity_log || []),
           improvementSuggestions: normalizeImprovementSuggestions(raw.improvementSuggestions || raw.improvement_suggestions || []),
           suggestionNotifications: normalizeSuggestionNotifications(raw.suggestionNotifications || raw.suggestion_notifications || []),
+          crewMessages: normalizeCrewMessages(raw.crewMessages || raw.crew_messages || []),
+          copyRequests: normalizeCrewCopyRequests([
+            ...(Array.isArray(raw.copyRequests) ? raw.copyRequests : []),
+            ...(Array.isArray(raw.copy_requests) ? raw.copy_requests : []),
+            ...(Array.isArray(raw.crewCopyRequests) ? raw.crewCopyRequests : []),
+            ...(Array.isArray(raw.crew_copy_requests) ? raw.crew_copy_requests : [])
+          ]),
+          crewCopyRequests: [],
           suggestionWeeklyRanking: normalizeSuggestionWeeklyRanking(raw.suggestionWeeklyRanking || raw.suggestion_weekly_ranking),
           managementPermissions: normalizeManagementPermissions(raw.managementPermissions || raw.management_permissions),
           procedureLibrary: normalizeProcedureLibrary(raw.procedureLibrary || raw.procedure_library),
@@ -2379,6 +3950,7 @@
           profiles: Array.isArray(raw.profiles) ? raw.profiles : []
         };
 
+        appData.crewCopyRequests = appData.copyRequests;
         appData.profiles = appData.profiles.map(profile => normalizeProfile(profile));
         return ensureDefaultClientStructure(appData);
       }
@@ -2785,10 +4357,10 @@
         const now = new Date().toISOString();
         const published = {
           id: createId(),
-          title: "Biblioteca de Procedimentos SATS",
+          title: "Biblioteca de Procedimentos STS",
           versionLabel: "v1",
           publishedAt: now,
-          publishedBy: "SATS",
+          publishedBy: "STS",
           changeSummary: "Biblioteca inicial editável",
           categories: [{
             id: "laudos-fisicos",
@@ -2839,7 +4411,7 @@
           published,
           versions: [],
           updatedAt: now,
-          updatedBy: "SATS"
+          updatedBy: "STS"
         };
       }
 
@@ -2967,7 +4539,7 @@
       function normalizeProcedureSnapshot(raw = {}) {
         return {
           id: raw.id || createId(),
-          title: String(raw.title || "Biblioteca de Procedimentos SATS"),
+          title: String(raw.title || "Biblioteca de Procedimentos STS"),
           versionLabel: String(raw.versionLabel || ""),
           status: raw.status === "draft" ? "draft" : "published",
           baseVersionId: String(raw.baseVersionId || ""),
@@ -3113,6 +4685,97 @@
         })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
       }
 
+      function normalizeCrewMessages(entries) {
+        if (!Array.isArray(entries)) return [];
+        return entries.map(raw => ({
+          id: String(raw.id || createId()),
+          tipo: String(raw.tipo || raw.type || "pergunta_livre"),
+          remetente: String(raw.remetente || raw.fromName || ""),
+          remetenteEmail: String(raw.remetenteEmail || raw.fromEmail || ""),
+          destinatario: String(raw.destinatario || raw.toName || ""),
+          destinatarioEmail: String(raw.destinatarioEmail || raw.toEmail || ""),
+          titulo: String(raw.titulo || raw.title || ""),
+          mensagem: String(raw.mensagem || raw.message || ""),
+          dataCriacao: String(raw.dataCriacao || raw.createdAt || new Date().toISOString()),
+          lida: raw.lida === true || raw.read === true,
+          dataLeitura: String(raw.dataLeitura || raw.readAt || "")
+        }))
+          .filter(message => message.destinatarioEmail && message.remetenteEmail && (message.titulo || message.mensagem))
+          .sort((a, b) => String(b.dataCriacao).localeCompare(String(a.dataCriacao)));
+      }
+
+      function normalizeCrewCopyRequests(entries) {
+        if (!Array.isArray(entries)) return [];
+        const seen = new Set();
+        return entries.map(raw => {
+          const title = String(raw.sourceDocumentTitle || raw.sourceTitle || raw.source_document_title || raw.source_title || "");
+          return {
+            id: String(raw.id || createId()),
+            requesterEmail: normalizeEmail(raw.requesterEmail || raw.requester_email || ""),
+            requesterName: String(raw.requesterName || raw.requester_name || ""),
+            requesterProfileId: String(raw.requesterProfileId || raw.requester_profile_id || ""),
+            ownerEmail: normalizeEmail(raw.ownerEmail || raw.owner_email || ""),
+            ownerName: String(raw.ownerName || raw.owner_name || ""),
+            ownerProfileId: String(raw.ownerProfileId || raw.owner_profile_id || ""),
+            sourceFolderId: String(raw.sourceFolderId || raw.source_folder_id || ""),
+            sourceFolderName: String(raw.sourceFolderName || raw.source_folder_name || ""),
+            sourceDocumentId: String(raw.sourceDocumentId || raw.source_document_id || ""),
+            sourceDocumentType: String(raw.sourceDocumentType || raw.source_document_type || ""),
+            sourceDocumentTitle: title,
+            sourceTitle: title,
+            status: ["pending", "approved", "rejected", "cancelled"].includes(raw.status) ? raw.status : "pending",
+            createdAt: String(raw.createdAt || raw.created_at || new Date().toISOString()),
+            resolvedAt: String(raw.resolvedAt || raw.resolved_at || ""),
+            resolvedBy: String(raw.resolvedBy || raw.resolved_by || ""),
+            copiedDocumentId: String(raw.copiedDocumentId || raw.copied_document_id || ""),
+            rejectionReason: String(raw.rejectionReason || raw.rejection_reason || "")
+          };
+        })
+          .filter(request => request.requesterEmail && request.ownerEmail && request.sourceDocumentId && request.sourceDocumentType)
+          .filter(request => {
+            const key = request.id || [
+              request.requesterEmail,
+              request.ownerEmail,
+              request.sourceDocumentId,
+              request.status,
+              request.createdAt
+            ].join("|");
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      }
+
+      function normalizeProfileDocument(document = {}) {
+        const now = new Date().toISOString();
+        const type = ["textDocument", "checklist"].includes(document.type) ? document.type : "textDocument";
+        return {
+          id: String(document.id || createId()),
+          type,
+          title: String(document.title || (type === "checklist" ? "Checklist PGR" : "Documento sem título")),
+          content: String(document.content || ""),
+          folderId: String(document.folderId || DEFAULT_FOLDER_ID),
+          createdBy: normalizeEmail(document.createdBy || document.created_by || ""),
+          ownerEmail: normalizeEmail(document.ownerEmail || document.owner_email || document.createdBy || document.created_by || ""),
+          userEmail: normalizeEmail(document.userEmail || document.user_email || ""),
+          profileId: String(document.profileId || document.profile_id || document.ownerProfileId || ""),
+          ownerProfileId: String(document.ownerProfileId || document.owner_profile_id || document.profileId || document.profile_id || ""),
+          ownerName: String(document.ownerName || document.owner_name || ""),
+          updatedBy: normalizeEmail(document.updatedBy || document.updated_by || ""),
+          status: String(document.status || "draft"),
+          createdAt: String(document.createdAt || document.created_at || now),
+          updatedAt: String(document.updatedAt || document.updated_at || document.createdAt || now),
+          checklistData: document.checklistData && typeof document.checklistData === "object" ? document.checklistData : null,
+          copiedFrom: document.copiedFrom && typeof document.copiedFrom === "object" ? {
+            ownerEmail: normalizeEmail(document.copiedFrom.ownerEmail || ""),
+            ownerName: String(document.copiedFrom.ownerName || ""),
+            originalDocumentId: String(document.copiedFrom.originalDocumentId || ""),
+            copiedAt: String(document.copiedFrom.copiedAt || "")
+          } : null
+        };
+      }
+
       function getCurrentSuggestionWeekKey(date = new Date()) {
         const value = new Date(date);
         value.setHours(0, 0, 0, 0);
@@ -3219,12 +4882,13 @@
           hidden: profile.hidden === true,
           createdAt: profile.createdAt || new Date().toISOString(),
           lastAccess: profile.lastAccess || "",
-          folders: folders.map(folder => normalizeFolder(folder)),
-          plans: plans.map(plan => normalizePlan(plan))
+          folders: folders.map(folder => normalizeFolder(folder, profile)),
+          plans: plans.map(plan => normalizePlan(plan)),
+          documents: Array.isArray(profile.documents) ? profile.documents.map(normalizeProfileDocument) : []
         };
       }
 
-      function normalizeFolder(folder) {
+      function normalizeFolder(folder, profile = null) {
         return {
           id: folder.id || createId(),
           name: folder.id === DEFAULT_FOLDER_ID ? "Sem pasta" : folder.name || "Nova pasta",
@@ -3234,7 +4898,15 @@
           clientId: folder.clientId || "",
           unitId: folder.unitId || "",
           sectorId: folder.sectorId || "",
-          createdAt: folder.createdAt || new Date().toISOString()
+          createdBy: normalizeEmail(folder.createdBy || folder.created_by || ""),
+          ownerEmail: normalizeEmail(folder.ownerEmail || folder.owner_email || folder.createdBy || folder.created_by || ""),
+          userEmail: normalizeEmail(folder.userEmail || folder.user_email || ""),
+          profileId: folder.profileId || folder.profile_id || folder.ownerProfileId || profile?.id || "",
+          ownerProfileId: folder.ownerProfileId || folder.owner_profile_id || folder.profileId || folder.profile_id || profile?.id || "",
+          ownerName: folder.ownerName || folder.owner_name || folder.profileName || folder.createdByName || profile?.name || "",
+          profileName: folder.profileName || folder.profile_name || profile?.name || "",
+          createdAt: folder.createdAt || new Date().toISOString(),
+          updatedAt: folder.updatedAt || folder.createdAt || new Date().toISOString()
         };
       }
 
@@ -3254,6 +4926,18 @@
           sectorId: plan.sectorId || "",
           visibility: plan.visibility || "",
           documentStatus: plan.documentStatus || "",
+          createdBy: normalizeEmail(plan.createdBy || plan.created_by || ""),
+          ownerEmail: normalizeEmail(plan.ownerEmail || plan.owner_email || plan.createdBy || plan.created_by || ""),
+          userEmail: normalizeEmail(plan.userEmail || plan.user_email || ""),
+          profileId: plan.profileId || plan.profile_id || plan.ownerProfileId || "",
+          ownerProfileId: plan.ownerProfileId || plan.owner_profile_id || plan.profileId || plan.profile_id || "",
+          ownerName: plan.ownerName || plan.owner_name || "",
+          copiedFrom: plan.copiedFrom && typeof plan.copiedFrom === "object" ? {
+            ownerEmail: normalizeEmail(plan.copiedFrom.ownerEmail || ""),
+            ownerName: String(plan.copiedFrom.ownerName || ""),
+            originalDocumentId: String(plan.copiedFrom.originalDocumentId || ""),
+            copiedAt: String(plan.copiedFrom.copiedAt || "")
+          } : null,
           deleted,
           deletedAt,
           deletedBy: plan.deletedBy || "",
@@ -3459,27 +5143,44 @@
 
       function applySystemBranding() {
         const branding = normalizeSystemSettings(app.systemSettings).branding;
-        document.title = branding.appName || "SATS";
+        document.title = getStsBrandTitle(branding.appName);
         if (/^#[0-9a-f]{6}$/i.test(branding.accentColor)) {
           document.documentElement.style.setProperty("--blue", branding.accentColor);
         }
         if (branding.logoDataUrl && /^data:image\//.test(branding.logoDataUrl)) {
           const logo = document.querySelector(".auth-logo");
-          if (logo) logo.src = branding.logoDataUrl;
+          if (logo) {
+            logo.src = branding.logoDataUrl;
+            logo.dataset.customBrandLogo = "true";
+          }
           const favicon = document.getElementById("satsFavicon");
-          if (favicon) favicon.href = branding.logoDataUrl;
+          if (favicon) {
+            favicon.href = branding.logoDataUrl;
+            favicon.dataset.customBrandLogo = "true";
+          }
+        } else {
+          document.querySelectorAll(".auth-logo").forEach(logo => {
+            delete logo.dataset.customBrandLogo;
+          });
+          const favicon = document.getElementById("satsFavicon");
+          if (favicon) delete favicon.dataset.customBrandLogo;
+          syncStsBrandAssets();
         }
       }
 
       function renderApp() {
         const showAuth = !currentUser;
         applySystemBranding();
+        renderRecoveryBanner();
         updateRestrictedAdminUi();
         updateAdminModeToggle();
         els.authScreen.classList.toggle("hidden", !showAuth);
         if (showAuth) {
           selectedPortalApp = null;
+          renderGlobalHeader();
           els.appSelectorScreen.classList.add("hidden");
+          els.euTecnicoScreen?.classList.add("hidden");
+          els.crewScreen?.classList.add("hidden");
           els.documentAutomationScreen.classList.add("hidden");
           els.proceduresScreen.classList.add("hidden");
           els.managementScreen.classList.add("hidden");
@@ -3489,7 +5190,8 @@
           return;
         }
         if (renderMaintenanceGate()) {
-          [els.appSelectorScreen, els.documentAutomationScreen, els.proceduresScreen, els.managementScreen, els.profileScreen, els.folderScreen, els.editorScreen].forEach(screen => screen.classList.add("hidden"));
+          renderGlobalHeader();
+          [els.appSelectorScreen, els.euTecnicoScreen, els.crewScreen, els.documentAutomationScreen, els.proceduresScreen, els.managementScreen, els.profileScreen, els.folderScreen, els.editorScreen].forEach(screen => screen?.classList.add("hidden"));
           return;
         }
 
@@ -3502,13 +5204,18 @@
         }
 
         const showSelector = !selectedPortalApp;
+        const showEuTecnico = selectedPortalApp === "euTecnico";
+        const showCrew = selectedPortalApp === "crew";
         const showDocumentAutomation = selectedPortalApp === "documentAutomation";
         const showProcedures = selectedPortalApp === "procedures";
         const showManagement = selectedPortalApp === "management";
         els.appSelectorScreen.classList.toggle("hidden", !showSelector);
+        els.euTecnicoScreen?.classList.toggle("hidden", !showEuTecnico);
+        els.crewScreen?.classList.toggle("hidden", !showCrew);
         els.documentAutomationScreen.classList.toggle("hidden", !showDocumentAutomation);
         els.proceduresScreen.classList.toggle("hidden", !showProcedures);
         els.managementScreen.classList.toggle("hidden", !showManagement);
+        renderGlobalHeader();
         if (showSelector) {
           els.profileScreen.classList.add("hidden");
           els.folderScreen.classList.add("hidden");
@@ -3516,6 +5223,30 @@
           hideFolderContextMenu();
           hideRichToolbar();
           renderAppSelector();
+          return;
+        }
+
+        if (showEuTecnico) {
+          els.documentAutomationScreen.classList.add("hidden");
+          els.managementScreen.classList.add("hidden");
+          els.profileScreen.classList.add("hidden");
+          els.folderScreen.classList.add("hidden");
+          els.editorScreen.classList.add("hidden");
+          hideFolderContextMenu();
+          hideRichToolbar();
+          renderEuTecnico();
+          return;
+        }
+
+        if (showCrew) {
+          els.documentAutomationScreen.classList.add("hidden");
+          els.managementScreen.classList.add("hidden");
+          els.profileScreen.classList.add("hidden");
+          els.folderScreen.classList.add("hidden");
+          els.editorScreen.classList.add("hidden");
+          hideFolderContextMenu();
+          hideRichToolbar();
+          renderCrew();
           return;
         }
 
@@ -3598,6 +5329,9 @@
           : "Usuário conectado";
         updateThemeToggle();
         renderManagementAppCard();
+        renderMenuLayout();
+        renderGlobalHeader();
+        renderCrewBadges();
         renderAppSelectorImprovements();
         maybeShowPendingSuggestionNotification();
       }
@@ -3617,11 +5351,487 @@
           <span class="app-choice-icon" aria-hidden="true">
             <svg class="icon" viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/><path d="m3 7 6-4 6 6 6-5"/></svg>
           </span>
-          <strong>Gestão SATS</strong>
+          <strong>Gestão STS</strong>
           <p>Painel administrativo para acompanhar perfis, planos, sugestões e atividades do sistema.</p>
           <span class="app-choice-open">Abrir aplicativo <span aria-hidden="true">→</span></span>`;
         card.addEventListener("click", handleAppChoice);
         els.managementAppCardMount.appendChild(card);
+      }
+
+      function renderGlobalHeader() {
+        if (!els.globalAppHeader) return;
+        const visible = !!currentUser;
+        els.globalAppHeader.classList.toggle("hidden", !visible);
+        if (!visible) return;
+        const inMenu = !selectedPortalApp;
+        els.globalAppHeader.classList.toggle("is-menu", inMenu);
+        if (els.globalMenuBackBtn) els.globalMenuBackBtn.classList.toggle("hidden", inMenu);
+        if (els.globalModuleLabel) els.globalModuleLabel.textContent = getPortalAppLabel(selectedPortalApp);
+        if (els.globalUserLabel) {
+          const profile = findAvatarProfileByUser() || findProfileByUser();
+          if (profile?.avatarPhoto) cacheProfileAvatar(currentUser, profile);
+          const avatar = profile?.avatarPhoto
+            ? `<img src="${escapeAttr(profile.avatarPhoto)}" alt="">`
+            : escapeHtml(userInitials(profile?.name || currentUser?.email || "U"));
+          els.globalUserLabel.innerHTML = `
+            <span class="global-user-avatar">${avatar}</span>
+            <span class="global-user-email">${escapeHtml(currentUser?.email || "Usuário conectado")}</span>
+          `;
+        }
+        if (els.globalManagementBtn) els.globalManagementBtn.classList.toggle("hidden", !canAccessManagementPhase1());
+        updateThemeToggle();
+      }
+
+      function getPortalAppLabel(appChoice = selectedPortalApp) {
+        const labels = {
+          euTecnico: "Eu Técnico",
+          crew: "Companheiros de Tripulação",
+          plans: "Plano de Ação",
+          procedures: "Procedimentos",
+          documentAutomation: "Automação de Documentos",
+          management: "Gestão STS"
+        };
+        return labels[appChoice] || "MENU";
+      }
+
+      function renderMenuLayout() {
+        const intro = els.appSelectorScreen?.querySelector(".app-selector-intro");
+        const grid = els.appSelectorScreen?.querySelector(".app-selector-grid");
+        const secondary = els.appSelectorScreen?.querySelector(".app-selector-secondary-grid");
+        if (!intro || !grid || !secondary) return;
+        intro.innerHTML = `
+          <p class="app-selector-kicker">STS</p>
+          <h1>MENU</h1>
+          <p>Escolha a área em que deseja trabalhar.</p>
+        `;
+        const unread = getCrewUnreadMessages().length;
+        grid.classList.remove("has-management");
+        grid.classList.add("sats-menu-grid");
+        grid.innerHTML = `
+          <section class="sats-menu-column" aria-label="Rotina técnica">
+            <div class="sats-menu-column-head">
+              <strong>Rotina técnica</strong>
+              <span>Seu trabalho diário</span>
+            </div>
+            ${renderMenuCardHtml({
+              choice: "euTecnico",
+              tone: "blue",
+              icon: "userTool",
+              title: "Eu Técnico",
+              text: "Acesse empresas, planos de ação e suas rotinas técnicas.",
+              action: "Abrir área"
+            })}
+            ${renderMenuCardHtml({
+              choice: "crew",
+              tone: "cyan",
+              icon: "crew",
+              title: "Companheiros de Tripulação",
+              text: "Envie solicitações e acompanhe mensagens da equipe.",
+              action: "Abrir tripulação",
+              badge: unread ? String(unread) : ""
+            })}
+          </section>
+          <section class="sats-menu-column" aria-label="Recursos STS">
+            <div class="sats-menu-column-head">
+              <strong>Recursos STS</strong>
+              <span>Consulta e produção</span>
+            </div>
+            ${renderMenuCardHtml({
+              choice: "procedures",
+              tone: "green",
+              icon: "procedures",
+              title: "Procedimentos",
+              text: "Consulte riscos, laudos, conceitos e orientações técnicas.",
+              action: "Abrir procedimentos"
+            })}
+            ${renderMenuCardHtml({
+              choice: "documentAutomation",
+              tone: "yellow",
+              icon: "automation",
+              title: "Automação de Documentos",
+              text: "Transforme arquivos do SOC em documentos técnicos revisáveis.",
+              action: "Abrir beta",
+              beta: "Beta"
+            })}
+          </section>
+        `;
+        secondary.innerHTML = "";
+        grid.querySelectorAll("[data-app-choice]").forEach(button => button.addEventListener("click", handleAppChoice));
+      }
+
+      function renderMenuCardHtml({ choice, tone, icon, title, text, action, beta = "", badge = "" }) {
+        return `
+          <button class="app-choice-card sats-menu-card is-${escapeAttr(tone)}" type="button" data-app-choice="${escapeAttr(choice)}">
+            <span class="app-choice-icon" aria-hidden="true">${menuIconSvg(icon)}</span>
+            ${beta ? `<span class="app-choice-badge">${escapeHtml(beta)}</span>` : ""}
+            ${badge ? `<span class="crew-menu-badge" id="crewUnreadBadge">${escapeHtml(badge)}</span>` : ""}
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(text)}</p>
+            <span class="app-choice-open" title="${escapeAttr(action)}">${menuIconSvg("arrow")}</span>
+          </button>
+        `;
+      }
+
+      function getEuTecnicoEntries() {
+        const entries = [];
+        const ownProfile = findProfileByUser();
+        if (!ownProfile || ownProfile.hidden || isRestrictedAdminEmail(ownProfile.email)) return entries;
+        const ownershipChanged = normalizeEuTecnicoOwnership(ownProfile);
+        const globalFolders = (app.profiles || []).flatMap(profile => profile.folders || []);
+        const allFolders = getVisibleFolders(ownProfile);
+        const visibleFolders = allFolders;
+        logEuTecnicoFolderDebug(globalFolders, visibleFolders);
+        visibleFolders.forEach(folder => {
+          const activePlans = getActivePlans(ownProfile).filter(plan =>
+            (plan.folderId || DEFAULT_FOLDER_ID) === folder.id
+          );
+          const companyName = folder.isDefault
+            ? (ownProfile.company || ownProfile.name || "Sem pasta")
+            : folder.name;
+          entries.push({
+            id: `${ownProfile.id}:${folder.id}`,
+            profileId: ownProfile.id,
+            folderId: folder.id,
+            title: companyName,
+            subtitle: folder.isDefault ? ownProfile.name : `${ownProfile.name} • ${folder.name}`,
+            profileName: ownProfile.name,
+            folderName: folder.name,
+            planCount: activePlans.length,
+            hidden: ownProfile.hidden || folder.hidden
+          });
+        });
+        if (ownershipChanged) saveApp({ profileId: ownProfile.id });
+        return entries.sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+        (app.profiles || []).forEach(profile => {
+          if (!isSystemAdminUser() && isRestrictedAdminEmail(profile.email)) return;
+          if (!canAccessHiddenItems() && profile.hidden) return;
+          const folders = getVisibleFolders(profile);
+          folders.forEach(folder => {
+            const activePlans = getActivePlans(profile).filter(plan => (plan.folderId || DEFAULT_FOLDER_ID) === folder.id);
+            const companyName = folder.isDefault
+              ? (profile.company || profile.name || "Sem pasta")
+              : folder.name;
+            entries.push({
+              id: `${profile.id}:${folder.id}`,
+              profileId: profile.id,
+              folderId: folder.id,
+              title: companyName,
+              subtitle: folder.isDefault ? profile.name : `${profile.name} • ${folder.name}`,
+              profileName: profile.name,
+              folderName: folder.name,
+              planCount: activePlans.length,
+              hidden: profile.hidden || folder.hidden
+            });
+          });
+        });
+        return entries.sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+      }
+
+      function logEuTecnicoFolderDebug(allFolders, visibleFolders) {
+        const enabled = window.SATS_EU_TECNICO_DEBUG === true || /[?&]debugEuTecnico=1\b/.test(window.location.search);
+        if (!enabled) return;
+        console.log("[Eu Técnico] Usuário atual:", currentUser?.email || "");
+        console.log("[Eu Técnico] Total de pastas globais:", allFolders.length);
+        console.log("[Eu Técnico] Pastas visíveis para o usuário:", visibleFolders.length);
+      }
+
+      function ensureEuTecnicoSelection(entries = getEuTecnicoEntries()) {
+        if (entries.some(entry => entry.profileId === euTecnicoSelectedProfileId && entry.folderId === euTecnicoSelectedFolderId)) return;
+        const fromApp = entries.find(entry => entry.profileId === app.activeProfileId && entry.folderId === app.activeFolderId);
+        const selected = fromApp || entries[0] || null;
+        euTecnicoSelectedProfileId = selected?.profileId || "";
+        euTecnicoSelectedFolderId = selected?.folderId || "";
+      }
+
+      function renderEuTecnico() {
+        const entries = getEuTecnicoEntries();
+        ensureEuTecnicoSelection(entries);
+        const query = normalizeText(euTecnicoSearchTerm);
+        const filtered = query
+          ? entries.filter(entry => normalizeText(`${entry.title} ${entry.subtitle}`).includes(query))
+          : entries;
+        const countLabel = document.getElementById("euTecnicoCompanyCount");
+        if (countLabel) countLabel.textContent = `${filtered.length} ${filtered.length === 1 ? "item" : "itens"}`;
+
+        if (els.euTecnicoSearch && els.euTecnicoSearch.value !== euTecnicoSearchTerm) {
+          els.euTecnicoSearch.value = euTecnicoSearchTerm;
+        }
+
+        if (els.euTecnicoCompanyList) {
+          els.euTecnicoCompanyList.innerHTML = filtered.length ? filtered.map(entry => `
+            <button class="eu-tecnico-company-card ${entry.profileId === euTecnicoSelectedProfileId && entry.folderId === euTecnicoSelectedFolderId ? "is-active" : ""}" type="button" data-eu-profile="${escapeAttr(entry.profileId)}" data-eu-folder="${escapeAttr(entry.folderId)}">
+              <strong>${escapeHtml(entry.title)}</strong>
+              <span>${escapeHtml(entry.subtitle)}</span>
+              <small>${entry.planCount} plano${entry.planCount === 1 ? "" : "s"}</small>
+            </button>
+          `).join("") : `<div class="empty-state">Você ainda não criou nenhuma pasta.<br>Clique em Criar pasta para começar.</div>`;
+        }
+
+        const selected = entries.find(entry => entry.profileId === euTecnicoSelectedProfileId && entry.folderId === euTecnicoSelectedFolderId) || null;
+        if (els.euTecnicoSelectedSummary) {
+          els.euTecnicoSelectedSummary.innerHTML = selected ? `
+            <div>
+              <p class="section-kicker">Empresa selecionada</p>
+              <h2>${escapeHtml(selected.title)}</h2>
+              <span>${escapeHtml(selected.subtitle)}</span>
+            </div>
+            <button class="button ghost" type="button" data-eu-action="open-folder">Abrir no Plano de Ação</button>
+          ` : `<div class="empty-state">Selecione uma empresa para ver os planos.</div>`;
+        }
+        renderEuTecnicoPlans(selected);
+      }
+
+      function renderEuTecnicoPlans(selected) {
+        if (!els.euTecnicoPlansPanel) return;
+        if (!selected) {
+          els.euTecnicoPlansPanel.innerHTML = `
+            <div class="eu-tecnico-checklist-placeholder">
+              <strong>Checklist técnico</strong>
+              <p>Em breve este módulo receberá modelos de checklist técnico.</p>
+            </div>`;
+          return;
+        }
+        const profile = app.profiles.find(item => item.id === selected.profileId);
+        const plans = getActivePlans(profile).filter(plan =>
+          (plan.folderId || DEFAULT_FOLDER_ID) === selected.folderId
+        );
+        els.euTecnicoPlansPanel.innerHTML = `
+          <div class="eu-tecnico-plan-head">
+            <h2>Planos de ação</h2>
+            <button class="button primary" type="button" data-eu-action="new-plan">Criar novo plano de ação</button>
+          </div>
+          ${plans.length ? `<div class="eu-tecnico-plan-list">${plans.map(plan => `
+            <article class="eu-tecnico-plan-card">
+              <div>
+                <strong>${escapeHtml(plan.title || "Plano sem nome")}</strong>
+                <span>${escapeHtml(plan.company || plan.data?.meta?.company || selected.title)}</span>
+              </div>
+              <button class="button ghost" type="button" data-eu-open-plan="${escapeAttr(plan.id)}">Abrir</button>
+            </article>
+          `).join("")}</div>` : `<div class="empty-state">Nenhum plano nesta empresa ainda.</div>`}
+          <div class="eu-tecnico-checklist-placeholder">
+            <strong>Checklist técnico</strong>
+            <p>Em breve este módulo receberá modelos de checklist técnico.</p>
+          </div>
+        `;
+      }
+
+      function getCurrentCrewProfile() {
+        return findProfileByUser() || {
+          name: currentUser?.email || "Usuário",
+          email: currentUser?.email || "",
+          userId: currentUser?.id || ""
+        };
+      }
+
+      function getCrewMessagesForCurrentUser() {
+        const email = normalizeEmail(currentUser?.email);
+        return normalizeCrewMessages(app.crewMessages).filter(message => normalizeEmail(message.destinatarioEmail) === email);
+      }
+
+      function getCrewUnreadMessages() {
+        return getCrewMessagesForCurrentUser().filter(message => !message.lida);
+      }
+
+      function getCrewPendingCopyRequestsForCurrentUser() {
+        const email = normalizeEmail(currentUser?.email);
+        return normalizeCrewCopyRequests([
+          ...(Array.isArray(app.copyRequests) ? app.copyRequests : []),
+          ...(Array.isArray(app.crewCopyRequests) ? app.crewCopyRequests : [])
+        ]).filter(request => normalizeEmail(request.ownerEmail) === email && request.status === "pending");
+      }
+
+      function renderCrewBadges() {
+        const count = getCrewPendingCopyRequestsForCurrentUser().length;
+        document.querySelectorAll("#crewUnreadBadge, [data-crew-badge]").forEach(badge => {
+          badge.textContent = count ? String(count) : "";
+          badge.classList.toggle("hidden", !count);
+        });
+      }
+
+      function renderCrew() {
+        renderCrewProfiles();
+        renderCrewInbox();
+        renderCrewBadges();
+      }
+
+      function renderCrewProfiles() {
+        if (!els.crewProfileList) return;
+        const currentEmail = normalizeEmail(currentUser?.email);
+        const profiles = getVisibleTeamProfiles().filter(profile => normalizeEmail(profile.email) !== currentEmail);
+        const countLabel = document.getElementById("crewProfileCount");
+        if (countLabel) countLabel.textContent = `${profiles.length} ${profiles.length === 1 ? "pessoa" : "pessoas"}`;
+        els.crewProfileList.innerHTML = profiles.length ? profiles.map(profile => `
+          <article class="crew-profile-card">
+            <div>
+              <strong>${escapeHtml(profile.name || profile.email || "Perfil")}</strong>
+              <span>${escapeHtml(profile.email || "sem e-mail")}</span>
+              ${profile.company ? `<small>${escapeHtml(profile.company)}</small>` : ""}
+            </div>
+            <button class="button ghost" type="button" data-crew-recipient="${escapeAttr(profile.id || profile.userId)}">Enviar</button>
+          </article>
+        `).join("") : `<div class="empty-state">Nenhum companheiro de tripulação disponível.</div>`;
+      }
+
+      function renderCrewInbox() {
+        if (!els.crewInboxList) return;
+        const messages = getCrewMessagesForCurrentUser();
+        const countLabel = document.getElementById("crewMessageCount");
+        if (countLabel) countLabel.textContent = `${messages.length} ${messages.length === 1 ? "mensagem" : "mensagens"}`;
+        els.crewInboxList.innerHTML = messages.length ? messages.map(message => `
+          <article class="crew-message-card ${message.lida ? "" : "is-unread"}" data-crew-message-id="${escapeAttr(message.id)}">
+            <div>
+              <strong>${escapeHtml(message.titulo || crewTypeLabel(message.tipo))}</strong>
+              <span>${escapeHtml(crewTypeLabel(message.tipo))} • ${escapeHtml(message.remetente || message.remetenteEmail)}</span>
+              <p>${escapeHtml(message.mensagem)}</p>
+              <small>${escapeHtml(formatDateTime(message.dataCriacao))}</small>
+            </div>
+            ${message.lida ? `<span class="crew-read-state">Lida</span>` : `<button class="button ghost" type="button" data-crew-read="${escapeAttr(message.id)}">Marcar como lida</button>`}
+          </article>
+        `).join("") : `<div class="empty-state">Nenhuma mensagem para você.</div>`;
+      }
+
+      function crewTypeLabel(type) {
+        return {
+          solicitar_plano_acao: "Solicitar plano de ação",
+          pedir_ajuda: "Pedir ajuda",
+          pergunta_livre: "Pergunta livre"
+        }[type] || "Mensagem";
+      }
+
+      function handleEuTecnicoClick(event) {
+        const companyButton = event.target.closest("[data-eu-profile][data-eu-folder]");
+        if (companyButton) {
+          euTecnicoSelectedProfileId = companyButton.dataset.euProfile || "";
+          euTecnicoSelectedFolderId = companyButton.dataset.euFolder || DEFAULT_FOLDER_ID;
+          renderEuTecnico();
+          return;
+        }
+
+        const action = event.target.closest("[data-eu-action]");
+        if (action) {
+          const type = action.dataset.euAction;
+          if (type === "checklist") {
+            showToast("Em breve este módulo receberá modelos de checklist técnico.", "info");
+            return;
+          }
+          if (type === "open-folder") {
+            return openEuTecnicoFolder();
+          }
+          if (type === "new-plan") {
+            return createEuTecnicoPlan();
+          }
+        }
+
+        const planButton = event.target.closest("[data-eu-open-plan]");
+        if (planButton) openEuTecnicoPlan(planButton.dataset.euOpenPlan);
+      }
+
+      function getSelectedEuTecnicoEntry() {
+        return getEuTecnicoEntries().find(entry => entry.profileId === euTecnicoSelectedProfileId && entry.folderId === euTecnicoSelectedFolderId) || null;
+      }
+
+      function openEuTecnicoFolder() {
+        const selected = getSelectedEuTecnicoEntry();
+        if (!selected) return showToast("Selecione uma empresa antes de abrir o Plano de Ação.", "warning");
+        selectedPortalApp = "plans";
+        app.activeProfileId = selected.profileId;
+        app.activeFolderId = selected.folderId || DEFAULT_FOLDER_ID;
+        app.activePlanId = null;
+        app.view = "folders";
+        saveApp({ localOnly: true });
+        renderApp();
+      }
+
+      function createEuTecnicoPlan() {
+        const selected = getSelectedEuTecnicoEntry();
+        if (!selected) return showToast("Selecione uma empresa antes de criar um plano de ação.", "warning");
+        selectedPortalApp = "plans";
+        app.activeProfileId = selected.profileId;
+        app.activeFolderId = selected.folderId || DEFAULT_FOLDER_ID;
+        app.activePlanId = null;
+        app.view = "folders";
+        saveApp({ localOnly: true });
+        renderApp();
+        openPlanModal();
+      }
+
+      function openEuTecnicoPlan(planId) {
+        const selected = getSelectedEuTecnicoEntry();
+        if (!selected || !planId) return;
+        selectedPortalApp = "plans";
+        app.activeProfileId = selected.profileId;
+        app.activeFolderId = selected.folderId || DEFAULT_FOLDER_ID;
+        app.activePlanId = planId;
+        app.view = "editor";
+        saveApp({ localOnly: true });
+        renderApp();
+      }
+
+      function handleCrewClick(event) {
+        const recipientButton = event.target.closest("[data-crew-recipient]");
+        if (recipientButton) {
+          const recipientId = recipientButton.dataset.crewRecipient;
+          const profile = getVisibleTeamProfiles().find(item => item.id === recipientId || item.userId === recipientId);
+          if (profile) openCrewMessageModal(profile);
+          return;
+        }
+
+        const readButton = event.target.closest("[data-crew-read]");
+        if (readButton) {
+          markCrewMessageAsRead(readButton.dataset.crewRead);
+        }
+      }
+
+      function openCrewMessageModal(profile) {
+        crewSelectedRecipient = profile;
+        if (els.crewRecipientName) els.crewRecipientName.textContent = profile.name || profile.email || "Destinatário";
+        if (els.crewRecipientEmail) els.crewRecipientEmail.textContent = profile.email || "";
+        if (els.crewMessageType) els.crewMessageType.value = "solicitar_plano_acao";
+        if (els.crewMessageTitle) els.crewMessageTitle.value = "";
+        if (els.crewMessageText) els.crewMessageText.value = "";
+        openModal("crewMessageModal");
+      }
+
+      function submitCrewMessage(event) {
+        event.preventDefault();
+        if (!crewSelectedRecipient) return;
+        const sender = getCurrentCrewProfile();
+        const recipientEmail = crewSelectedRecipient.email || "";
+        if (!recipientEmail) return showToast("Este perfil não possui e-mail para receber mensagens.", "warning");
+        const message = {
+          id: createId(),
+          tipo: els.crewMessageType?.value || "pergunta_livre",
+          remetente: sender.name || currentUser?.email || "Usuário",
+          remetenteEmail: sender.email || currentUser?.email || "",
+          destinatario: crewSelectedRecipient.name || recipientEmail,
+          destinatarioEmail: recipientEmail,
+          titulo: (els.crewMessageTitle?.value || "").trim(),
+          mensagem: (els.crewMessageText?.value || "").trim(),
+          dataCriacao: new Date().toISOString(),
+          lida: false,
+          dataLeitura: ""
+        };
+        if (!message.titulo || !message.mensagem) return showToast("Informe título e mensagem.", "warning");
+        app.crewMessages = normalizeCrewMessages([message, ...(app.crewMessages || [])]);
+        recordActivity("Enviou mensagem à tripulação", `${message.remetente} enviou ${crewTypeLabel(message.tipo)} para ${message.destinatario}.`);
+        saveApp({ fullSave: true });
+        closeModal("crewMessageModal");
+        showToast("Mensagem enviada.", "success");
+        renderCrew();
+        renderMenuLayout();
+      }
+
+      function markCrewMessageAsRead(messageId) {
+        app.crewMessages = normalizeCrewMessages(app.crewMessages);
+        const email = normalizeEmail(currentUser?.email);
+        const message = app.crewMessages.find(item => item.id === messageId && normalizeEmail(item.destinatarioEmail) === email);
+        if (!message) return;
+        message.lida = true;
+        message.dataLeitura = new Date().toISOString();
+        saveApp({ fullSave: true });
+        renderCrew();
+        renderMenuLayout();
       }
 
       function getDocumentAutomation() {
@@ -3827,7 +6037,7 @@
           <strong>Modelo padrão carregado</strong>
           <span>LTCAT oficial eProtege</span>
           <div class="document-automation-file-row">
-            <span>O SATS usará automaticamente o modelo oficial de LTCAT cadastrado no sistema.</span>
+            <span>O STS usará automaticamente o modelo oficial de LTCAT cadastrado no sistema.</span>
           </div>
         </div>`;
       }
@@ -4107,7 +6317,7 @@
             <section class="document-automation-card">
               <h3>Modelo padrão carregado</h3>
               <p><strong>${escapeHtml(DEFAULT_LTCAT_TEMPLATE_NAME)}</strong></p>
-              <p>O SATS vai abrir este DOCX, substituir o marcador de ENQUADRAMENTO PREVIDENCIÁRIO e baixar um novo .docx.</p>
+              <p>O STS vai abrir este DOCX, substituir o marcador de ENQUADRAMENTO PREVIDENCIÁRIO e baixar um novo .docx.</p>
             </section>
             <section class="document-automation-card">
               <h3>Local de inserção</h3>
@@ -4135,7 +6345,7 @@
               <h3>Debug da geração</h3>
               ${ltcatWordTable(["Verificação", "Status"], [
                 ["Modelo padrão carregado", "Sim"],
-                ["Capa preservada", "Sim, o SATS altera o DOCX original sem recriar a capa"],
+                ["Capa preservada", "Sim, o STS altera o DOCX original sem recriar a capa"],
                 ["Logo central preservada", "Sim, as mídias do template não são removidas"],
                 ["Logo da empresa enviada", project.sourceFiles?.companyLogo ? "Sim" : "Não"],
                 ["Documento do ano passado enviado", project.sourceFiles?.previousDocumentFile ? "Sim" : "Não"],
@@ -4161,7 +6371,7 @@
       function renderDocumentAutomationGenerateStep(project) {
         return `
           <section class="document-automation-panel">
-            <div class="management-panel-head"><div><h2>Gerar LTCAT</h2><small>O arquivo será gerado como .docx a partir do modelo oficial cadastrado no SATS.</small></div></div>
+            <div class="management-panel-head"><div><h2>Gerar LTCAT</h2><small>O arquivo será gerado como .docx a partir do modelo oficial cadastrado no STS.</small></div></div>
             ${renderDocumentAutomationValidation(project)}
             <div class="document-automation-actions">
               <button class="button" type="button" data-doc-action="download-json">Baixar JSON extraído</button>
@@ -5092,7 +7302,7 @@
         extracted.extractionDebug = {
           ...(extracted.extractionDebug || {}),
           mailMergeMap: LTCAT_MAIL_MERGE_MAP,
-          riskPasteMode: "O conteúdo rico colado será usado como prioridade. Se não houver conteúdo rico, o SATS usa a tabela nativa dos blocos SETOR extraídos."
+          riskPasteMode: "O conteúdo rico colado será usado como prioridade. Se não houver conteúdo rico, o STS usa a tabela nativa dos blocos SETOR extraídos."
         };
         project.extractedData = extracted;
         project.companyName = extracted.companyName || project.companyName;
@@ -5306,7 +7516,7 @@
           if (!data[field]) warnings.push(`${label}. O documento será gerado mesmo assim.`);
         });
         if (!hasLtcatFinalRiskContent(project)) missing.push("Cole o conteúdo rico dos riscos do SOC ou extraia os blocos SETOR pelo RTF antes de gerar o LTCAT");
-        else if (!hasLtcatRichRiskContent(project.ltcatRiskPaste || {})) warnings.push("Sem conteúdo rico colado. O SATS usará uma tabela nativa de fallback a partir dos blocos SETOR extraídos.");
+        else if (!hasLtcatRichRiskContent(project.ltcatRiskPaste || {})) warnings.push("Sem conteúdo rico colado. O STS usará uma tabela nativa de fallback a partir dos blocos SETOR extraídos.");
         if (data.rawRiskWarning) warnings.push(data.rawRiskWarning);
         if (!data.hierarchy?.sectors?.length) warnings.push("Nenhum setor encontrado");
         if (!project.manualFields?.revisionHistory?.length) warnings.push("Histórico de revisão vazio");
@@ -5430,7 +7640,7 @@
         if (!canAccessDocumentAutomation()) return showToast("Você não tem permissão para usar esta função.", "danger");
         const payload = {
           exportedAt: new Date().toISOString(),
-          app: "SATS",
+          app: "STS",
           module: "Automação de Documentos",
           type: project.type,
           title: project.title,
@@ -6570,7 +8780,7 @@ p { margin: 0 0 6pt; }
             ${ltcatWordSection("Termo de encerramento", ltcatParagraph(modelText.closingTerm))}
             ${ltcatWordSection("Referências bibliográficas", ltcatParagraph(modelText.references))}
             ${ltcatWordSection("Anexos", ltcatParagraph("Inserir anexos técnicos, certificados, medições, evidências fotográficas e demais documentos de apoio, quando aplicável."))}
-            <div class="ltcat-footer">SATS - Automação de Documentos | LTCAT Beta</div>
+            <div class="ltcat-footer">STS - Automação de Documentos | LTCAT Beta</div>
           </div>`;
 
         const styles = `
@@ -6827,6 +9037,178 @@ p { margin: 0 0 6pt; }
         }));
       }
 
+      function getManagementState() {
+        return app || createEmptyApp();
+      }
+
+      function getManagementProfiles() {
+        return getAllManagementProfiles();
+      }
+
+      function folderNameForProfile(profile, folderId) {
+        const folder = (profile?.folders || []).find(item => String(item.id || "") === String(folderId || ""));
+        if (folder) return folder.name || "Sem pasta";
+        return !folderId || folderId === DEFAULT_FOLDER_ID ? "Sem pasta" : "Pasta inexistente";
+      }
+
+      function normalizeManagementDocType(type = "", raw = {}) {
+        const value = String(type || raw.type || "").trim();
+        if (value === "planAction" || value === "plan" || raw.data?.actions) return "planAction";
+        if (value === "checklist" || value === "checklistPgr" || raw.checklistData || raw.selectedItems) return "checklistPgr";
+        if (value === "textDocument" || value === "text" || raw.content || raw.plainText) return "textDocument";
+        return "unknown";
+      }
+
+      function managementDocTypeLabel(type) {
+        return {
+          planAction: "Plano de Ação",
+          checklistPgr: "Checklist PGR",
+          textDocument: "Documento de Texto",
+          receivedDocument: "Recebido",
+          unknown: "Documento"
+        }[type] || "Documento";
+      }
+
+      function documentCompanyValue(type, raw) {
+        if (type === "planAction") return raw.company || raw.data?.meta?.company || raw.meta?.company || "";
+        if (type === "checklistPgr") return raw.companyName || raw.checklistData?.companyName || raw.company || "";
+        return raw.company || raw.templateName || "";
+      }
+
+      function documentTitleValue(type, raw) {
+        if (raw.title) return raw.title;
+        if (type === "planAction") return raw.data?.meta?.company ? `Plano de Ação - ${raw.data.meta.company}` : "Plano de Ação";
+        if (type === "checklistPgr") return raw.companyName ? `Checklist PGR - ${raw.companyName}` : "Checklist PGR";
+        if (type === "textDocument") return "Documento de Texto";
+        return "Documento sem título";
+      }
+
+      function normalizeManagementDocument(profile, raw, source = "", forcedType = "") {
+        const type = normalizeManagementDocType(forcedType, raw);
+        const folderId = raw.folderId || raw.originalFolderId || DEFAULT_FOLDER_ID;
+        const copied = !!raw.copiedFrom;
+        const deleted = !!(raw.deleted || raw.deletedAt || raw.trashExpiresAt || source === "trash");
+        return {
+          id: raw.id || createId(),
+          type: copied && type !== "unknown" ? type : type,
+          typeLabel: copied ? `${managementDocTypeLabel(type)} recebido` : managementDocTypeLabel(type),
+          title: documentTitleValue(type, raw),
+          company: documentCompanyValue(type, raw),
+          folderId,
+          folderName: folderNameForProfile(profile, folderId),
+          profileId: profile?.id || "",
+          profileName: profile?.name || "Sem perfil",
+          ownerEmail: raw.ownerEmail || raw.userEmail || raw.createdBy || profile?.email || "",
+          ownerName: raw.ownerName || profile?.name || "",
+          createdBy: raw.createdBy || profile?.email || "",
+          createdAt: raw.createdAt || raw.created_at || "",
+          updatedAt: raw.updatedAt || raw.updated_at || raw.lastUpdated || "",
+          deleted,
+          deletedAt: raw.deletedAt || "",
+          copiedFrom: raw.copiedFrom || null,
+          source,
+          raw
+        };
+      }
+
+      function getAllSTSManagementDocuments(options = {}) {
+        const includeDeleted = options.includeDeleted !== false;
+        const docs = [];
+        getAllManagementProfiles().forEach(profile => {
+          (profile.plans || []).forEach(plan => {
+            if (includeDeleted || !plan.deleted) docs.push(normalizeManagementDocument(profile, plan, plan.deleted ? "trash" : "profile.plans", "planAction"));
+          });
+          (profile.documents || []).forEach(doc => {
+            if (includeDeleted || !doc.deleted) docs.push(normalizeManagementDocument(profile, doc, doc.deleted ? "trash" : "profile.documents", doc.type || ""));
+          });
+          (profile.checklists || []).forEach(doc => {
+            if (includeDeleted || !doc.deleted) docs.push(normalizeManagementDocument(profile, doc, doc.deleted ? "trash" : "profile.checklists", "checklistPgr"));
+          });
+          (profile.textDocuments || []).forEach(doc => {
+            if (includeDeleted || !doc.deleted) docs.push(normalizeManagementDocument(profile, doc, doc.deleted ? "trash" : "profile.textDocuments", "textDocument"));
+          });
+        });
+        return docs.sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+      }
+
+      function getManagementDocuments() {
+        return getAllSTSManagementDocuments();
+      }
+
+      function getManagementPlans() {
+        return getAllSTSManagementDocuments().filter(doc => doc.type === "planAction");
+      }
+
+      function getManagementChecklists() {
+        return getAllSTSManagementDocuments().filter(doc => doc.type === "checklistPgr");
+      }
+
+      function getManagementTextDocuments() {
+        return getAllSTSManagementDocuments().filter(doc => doc.type === "textDocument");
+      }
+
+      function getManagementCopyRequests() {
+        return [
+          ...(Array.isArray(app.copyRequests) ? app.copyRequests : []),
+          ...(Array.isArray(app.crewCopyRequests) ? app.crewCopyRequests : [])
+        ].filter((request, index, list) => list.findIndex(item => item.id && item.id === request.id) === index);
+      }
+
+      function getManagementTrashItems() {
+        return getAllSTSManagementDocuments().filter(doc => doc.deleted);
+      }
+
+      function getManagementSuggestions() {
+        return normalizeImprovementSuggestions(app.improvementSuggestions);
+      }
+
+      function getManagementTemplates() {
+        return normalizeActionPlanTemplates(app.actionPlanTemplates);
+      }
+
+      function getManagementBackups() {
+        return normalizeBackupCenter(app.backupCenter).snapshots;
+      }
+
+      function getManagementPermissions() {
+        return normalizeManagementPermissions(app.managementPermissions);
+      }
+
+      function getManagementLogs() {
+        return normalizeActivityLog([...(app.activityLog || []), ...restrictedAccessLogs]);
+      }
+
+      function getManagementDiagnostics() {
+        return runSTSIntegrityDiagnostics(app);
+      }
+
+      function runSTSIntegrityDiagnostics(state = app) {
+        const base = runIntegrityDiagnostics(state);
+        const issues = [...(base.issues || [])];
+        const profiles = Array.isArray(state?.profiles) ? state.profiles : [];
+        profiles.forEach(profile => {
+          const folders = Array.isArray(profile.folders) ? profile.folders : [];
+          const folderIds = new Set(folders.map(folder => folder.id || DEFAULT_FOLDER_ID));
+          const folderNames = new Map();
+          folders.forEach(folder => {
+            const key = normalizeText(folder.name || "");
+            if (key && folderNames.has(key)) addIntegrityIssue(issues, "warning", `Pasta duplicada no perfil ${profile.name || profile.email}: ${folder.name}.`, { profileId: profile.id, folderId: folder.id });
+            if (key) folderNames.set(key, true);
+            if (!folder.ownerProfileId && !folder.isDefault) addIntegrityIssue(issues, "info", `Pasta sem ownerProfileId: ${folder.name || folder.id}.`, { profileId: profile.id, folderId: folder.id });
+            if (!folder.ownerEmail && !folder.isDefault) addIntegrityIssue(issues, "info", `Pasta sem ownerEmail: ${folder.name || folder.id}.`, { profileId: profile.id, folderId: folder.id });
+          });
+          getAllSTSManagementDocuments().filter(doc => doc.profileId === profile.id).forEach(doc => {
+            if (doc.folderId && !folderIds.has(doc.folderId)) addIntegrityIssue(issues, "warning", `${doc.typeLabel} com folderId inexistente: ${doc.title}.`, { profileId: profile.id, documentId: doc.id, folderId: doc.folderId });
+            if (!doc.ownerEmail && !doc.createdBy) addIntegrityIssue(issues, "info", `Documento sem dono claro: ${doc.title}.`, { profileId: profile.id, documentId: doc.id });
+            if (doc.copiedFrom && !doc.copiedFrom.originalDocumentId) addIntegrityIssue(issues, "warning", `Documento recebido com origem incompleta: ${doc.title}.`, { profileId: profile.id, documentId: doc.id });
+          });
+        });
+        getManagementCopyRequests().forEach(request => {
+          if (!request.sourceDocumentId) addIntegrityIssue(issues, "warning", `Solicitação de cópia sem documento de origem: ${request.id || "sem id"}.`, { requestId: request.id });
+        });
+        return { ...base, issues, hasErrors: issues.some(issue => issue.severity === "error") };
+      }
+
       function getClientRegistry() {
         app.clientRegistry = normalizeClientRegistry(app.clientRegistry);
         return app.clientRegistry;
@@ -6880,6 +9262,13 @@ p { margin: 0 0 6pt; }
       function getManagementStats() {
         const profiles = getAllManagementProfiles();
         const plans = getAllManagementPlans();
+        const managementDocs = getAllSTSManagementDocuments();
+        const checklists = getManagementChecklists();
+        const textDocuments = getManagementTextDocuments();
+        const receivedDocuments = managementDocs.filter(doc => doc.copiedFrom);
+        const copyRequests = getManagementCopyRequests();
+        const trashItems = getManagementTrashItems();
+        const diagnostics = getManagementDiagnostics();
         const suggestions = normalizeImprovementSuggestions(app.improvementSuggestions);
         const procedureLibrary = normalizeProcedureLibrary(app.procedureLibrary);
         const physicalCategory = procedureLibrary.published.categories.find(category => category.id === "laudos-fisicos");
@@ -6898,6 +9287,14 @@ p { margin: 0 0 6pt; }
           profiles: profiles.length,
           folders: profiles.reduce((total, profile) => total + getManagementFolders(profile).length, 0),
           plans: plans.length,
+          documents: managementDocs.filter(doc => !doc.deleted).length,
+          checklists: checklists.filter(doc => !doc.deleted).length,
+          textDocuments: textDocuments.filter(doc => !doc.deleted).length,
+          receivedDocuments: receivedDocuments.filter(doc => !doc.deleted).length,
+          pendingCopyRequests: copyRequests.filter(request => request.status === "pending").length,
+          trashItems: trashItems.length,
+          integrityAlerts: diagnostics.issues.length,
+          integrityErrors: diagnostics.issues.filter(issue => issue.severity === "error").length,
           actions: allActions.length,
           completed: allActions.filter(row => row.status === "Concluído").length,
           inProgress: allActions.filter(row => row.status === "Em andamento").length,
@@ -6932,12 +9329,19 @@ p { margin: 0 0 6pt; }
         if (["clients", "units", "sectors", "accesses", "commercial"].includes(tab)) return false;
         const checks = {
           permissions: canManagePermissions,
+          documents: canAccessManagementPhase1,
+          checklists: canAccessManagementPhase1,
+          textDocuments: canAccessManagementPhase1,
+          copyRequests: canAccessManagementPhase1,
+          trash: canAccessManagementPhase1,
+          templates: () => canManageActionPlanTemplates() || canAccessManagementPhase1(),
           activity: canViewActivity,
           procedures: canManageProcedures,
           backups: () => canManageBackups() || canRestoreBackups() || canExportFullSystem() || canImportFullSystem(),
           audit: canViewAuditTrail,
           settings: canManageSystemSettings,
-          diagnostics: canRunDiagnostics
+          diagnostics: canRunDiagnostics,
+          recovery: () => normalizeEmail(currentUser?.email || "") === SUPER_ADMIN_EMAIL
         };
         return checks[tab] ? checks[tab]() : canAccessManagementPhase1();
       }
@@ -6961,7 +9365,13 @@ p { margin: 0 0 6pt; }
         });
         if (activeManagementTab === "profiles") return renderManagementProfiles();
         if (activeManagementTab === "folders") return renderManagementFolders();
+        if (activeManagementTab === "documents") return renderManagementDocuments();
         if (activeManagementTab === "plans") return renderManagementPlans();
+        if (activeManagementTab === "checklists") return renderManagementChecklists();
+        if (activeManagementTab === "textDocuments") return renderManagementTextDocuments();
+        if (activeManagementTab === "copyRequests") return renderManagementCopyRequests();
+        if (activeManagementTab === "trash") return renderManagementTrash();
+        if (activeManagementTab === "templates") return renderManagementTemplates();
         if (activeManagementTab === "procedures") return renderManagementProcedures();
         if (activeManagementTab === "suggestions") return renderManagementSuggestions();
         if (activeManagementTab === "activity") return renderManagementActivity();
@@ -6970,6 +9380,7 @@ p { margin: 0 0 6pt; }
         if (activeManagementTab === "audit") return renderManagementAuditTrail();
         if (activeManagementTab === "settings") return renderManagementSettings();
         if (activeManagementTab === "diagnostics") return renderManagementDiagnostics();
+        if (activeManagementTab === "recovery") return renderManagementRecovery();
         renderManagementDashboard();
       }
 
@@ -6987,6 +9398,12 @@ p { margin: 0 0 6pt; }
           <section class="management-dashboard-grid">
             ${managementMetric("Total de perfis", stats.profiles)}
             ${managementMetric("Total de pastas", stats.folders)}
+            ${managementMetric("Documentos", stats.documents)}
+            ${managementMetric("Checklists PGR", stats.checklists)}
+            ${managementMetric("Docs de texto", stats.textDocuments)}
+            ${managementMetric("Recebidos", stats.receivedDocuments)}
+            ${managementMetric("Copias pendentes", stats.pendingCopyRequests)}
+            ${managementMetric("Itens na lixeira", stats.trashItems)}
             ${managementMetric("Planos de ação", stats.plans)}
             ${managementMetric("Templates ativos", stats.activeTemplates, `${stats.templates} no total`)}
             ${managementMetric("Ações pendentes", stats.pendingActions)}
@@ -6998,6 +9415,7 @@ p { margin: 0 0 6pt; }
             ${managementMetric("Último backup", stats.latestBackup ? formatDateTime(stats.latestBackup.createdAt) : "Nenhum")}
             ${managementMetric("Sincronização", stats.syncStatus)}
             ${managementMetric("Tamanho aproximado", `${stats.storageSizeKb} KB`)}
+            ${managementMetric("Alertas de integridade", stats.integrityAlerts, `${stats.integrityErrors} critico(s)`)}
             ${managementMetric("Procedimentos publicados", stats.publishedProcedureVersion, `${stats.activePhysicalReports} laudo(s) ativo(s)`)}
             ${managementMetric("Último plano editado", stats.latestPlan?.plan.title || "Nenhum", stats.latestPlan ? formatDateTime(stats.latestPlan.plan.updatedAt) : "")}
           </section>
@@ -7079,7 +9497,7 @@ p { margin: 0 0 6pt; }
         const lastBackup = normalizeBackupCenter(app.backupCenter).snapshots[0];
         els.managementContent.innerHTML = `
           <section class="management-panel">
-            <div class="management-panel-head"><div><h2>Configurações globais</h2><p>Edite e salve cada seção sem sair da Gestão SATS.</p></div><span class="management-status-badge">${settings.maintenance.enabled ? "Manutenção ativa" : "Operação normal"}</span></div>
+            <div class="management-panel-head"><div><h2>Configurações globais</h2><p>Edite e salve cada seção sem sair da Gestão STS.</p></div><span class="management-status-badge">${settings.maintenance.enabled ? "Manutenção ativa" : "Operação normal"}</span></div>
             <div class="management-settings-layout">
               <section class="management-settings-section">
                 <div><h3>Identidade do sistema</h3><p>Nome, subtítulo, logo e cor usados na interface.</p></div>
@@ -7104,7 +9522,7 @@ p { margin: 0 0 6pt; }
               </section>
 
               <section class="management-settings-section">
-                <div><h3>Exportações</h3><p>Preferências padrão para documentos gerados pelo SATS.</p></div>
+                <div><h3>Exportações</h3><p>Preferências padrão para documentos gerados pelo STS.</p></div>
                 <div class="management-settings-grid">
                   <label class="field">Formato padrão<select id="systemExportsFormat" ${canManageSystemSettings() ? "" : "disabled"}><option value="pdf" ${settings.exports.defaultFormat === "pdf" ? "selected" : ""}>PDF</option><option value="jpeg" ${settings.exports.defaultFormat === "jpeg" ? "selected" : ""}>JPEG</option><option value="rtf" ${settings.exports.defaultFormat === "rtf" ? "selected" : ""}>RTF</option></select></label>
                   <label class="field"><span>Conteúdo</span><span class="checkbox-line"><input type="checkbox" id="systemExportsLogo" ${settings.exports.includeLogo ? "checked" : ""} ${canManageSystemSettings() ? "" : "disabled"}> Incluir logo</span></label>
@@ -7195,6 +9613,245 @@ p { margin: 0 0 6pt; }
           <div class="management-diagnostic-grid">
           ${[["Planos sem título", diagnostic.plansWithoutTitle.length], ["Planos sem ações", diagnostic.plansWithoutActions.length], ["Planos sem pasta válida", diagnostic.orphanPlans.length], ["Ações sem responsável", diagnostic.actionsWithoutResponsible.length], ["Ações sem prazo", diagnostic.actionsWithoutDeadline.length], ["Ações vencidas", diagnostic.overdueActions.length], ["Ações com status inválido", diagnostic.invalidActionStatus.length], ["IDs duplicados", diagnostic.duplicateIds.length], ["Permissões quebradas", diagnostic.brokenPermissions.length], ["Templates inválidos", diagnostic.invalidTemplates.length], ["Templates inativos", diagnostic.inactiveTemplates.length], ["Procedimentos inválidos", diagnostic.procedureErrors], ["Imagens muito pesadas", diagnostic.heavyImages], ["Logs acima do recomendado", diagnostic.logsTooLarge ? 1 : 0], ["Backup ausente", diagnostic.backupMissing ? 1 : 0], ["Tamanho dos dados", `${Math.round(diagnostic.size / 1024)} KB`]].map(([label, value]) => `<article class="management-health-card" data-health="${Number(value) ? "warning" : "ok"}"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(value)}</p></article>`).join("")}
           </div></section>`;
+      }
+
+      function renderManagementRecovery() {
+        if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return renderManagementDashboard();
+        const localState = readLocalSharedCache() || app || createEmptyApp();
+        const diagnostics = runIntegrityDiagnostics(localState);
+        const syncStatus = isRecoveryModeActive() ? "Pausada por recovery" : (cloudReady ? "Ativa" : "Nao conectada");
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head">
+              <div><h2>Recuperacao e Integridade</h2><p>Ferramentas emergenciais para restaurar backup JSON e impedir sobrescrita por estado remoto ruim.</p></div>
+              <span class="management-status-badge">${isRecoveryModeActive() ? "Recovery ativo" : "Recovery desligado"}</span>
+            </div>
+            <div class="management-item-actions">
+              <button class="button primary" type="button" data-management-action="recovery-enable">Ativar modo recuperacao</button>
+              <button class="button" type="button" data-management-action="recovery-disable">Desativar modo recuperacao</button>
+              <button class="button" type="button" data-management-action="recovery-open">Importar backup JSON</button>
+              <button class="button" type="button" data-management-action="recovery-export-current">Exportar backup completo atual</button>
+              <button class="button" type="button" data-management-action="recovery-show-local">Ver estado local</button>
+              <button class="button" type="button" data-management-action="recovery-show-remote">Ver estado remoto</button>
+              <button class="button" type="button" data-management-action="recovery-show-conflicts">Ver conflitos de usuarios</button>
+              <button class="button" type="button" data-management-action="recovery-diagnostics">Ver diagnostico de perfis</button>
+              <button class="button" type="button" data-management-action="recovery-self-test">Executar autoteste seguro</button>
+            </div>
+            <div class="management-dashboard-grid">
+              ${managementMetric("Sincronizacao", syncStatus)}
+              ${managementMetric("Perfis", diagnostics.stats.profiles)}
+              ${managementMetric("Pastas", diagnostics.stats.folders)}
+              ${managementMetric("Planos", diagnostics.stats.plans)}
+              ${managementMetric("Conflitos graves", diagnostics.issues.filter(issue => issue.severity === "error").length)}
+            </div>
+          </section>
+          <section class="management-panel">
+            <div class="management-panel-head"><h2>Diagnostico de perfis</h2><span class="management-status-badge">${diagnostics.issues.length ? `${diagnostics.issues.length} aviso(s)` : "Saudavel"}</span></div>
+            ${recoverySummaryHtml(localState, diagnostics)}
+          </section>
+          <section class="management-panel">
+            <div class="management-panel-head"><h2>Estado local</h2><span class="management-status-badge">${escapeHtml(SHARED_STORAGE_KEY)}</span></div>
+            <pre class="management-json-preview">${escapeHtml(JSON.stringify({ stats: diagnostics.stats, activeProfileId: localState.activeProfileId || null, activeFolderId: localState.activeFolderId || null, updatedAt: readLocalSharedUpdatedAt() || "" }, null, 2))}</pre>
+          </section>`;
+      }
+
+      function managementDocumentSearchText(doc) {
+        return normalizeText([
+          doc.typeLabel,
+          doc.title,
+          doc.company,
+          doc.folderName,
+          doc.profileName,
+          doc.ownerEmail,
+          doc.createdBy,
+          doc.raw?.plainText,
+          doc.raw?.content,
+          doc.raw?.status
+        ].filter(Boolean).join(" "));
+      }
+
+      function filterManagementDocuments(docs, term = "", type = "all", status = "all") {
+        const normalized = normalizeText(term || "");
+        return docs.filter(doc => {
+          if (type !== "all") {
+            if (type === "received" && !doc.copiedFrom) return false;
+            else if (type !== "received" && doc.type !== type) return false;
+          }
+          if (status === "active" && doc.deleted) return false;
+          if (status === "trash" && !doc.deleted) return false;
+          if (status === "missingFolder" && doc.folderName !== "Pasta inexistente") return false;
+          if (status === "missingOwner" && (doc.ownerEmail || doc.createdBy)) return false;
+          if (normalized && !managementDocumentSearchText(doc).includes(normalized)) return false;
+          return true;
+        });
+      }
+
+      function managementDocumentActions(doc) {
+        const openLabel = doc.type === "planAction" ? "Abrir" : "Abrir pasta";
+        return `<div class="management-item-actions">
+          <button class="button" type="button" data-management-action="open-document" data-profile-id="${escapeAttr(doc.profileId)}" data-document-id="${escapeAttr(doc.id)}" data-document-type="${escapeAttr(doc.type)}">${openLabel}</button>
+          <button class="button" type="button" data-management-action="view-document-metadata" data-profile-id="${escapeAttr(doc.profileId)}" data-document-id="${escapeAttr(doc.id)}" data-document-type="${escapeAttr(doc.type)}">Metadados</button>
+        </div>`;
+      }
+
+      function renderManagementDocumentTable(docs, empty = "Nenhum documento encontrado.") {
+        return `<div class="management-table-wrap"><table class="management-table">
+          <thead><tr><th>Tipo</th><th>Titulo</th><th>Empresa</th><th>Pasta</th><th>Dono</th><th>Criado</th><th>Atualizado</th><th>Origem</th><th>Status</th><th>Acoes</th></tr></thead>
+          <tbody>${docs.map(doc => `<tr>
+            <td><strong>${escapeHtml(doc.typeLabel)}</strong></td>
+            <td><strong>${escapeHtml(doc.title)}</strong><small>${escapeHtml(doc.id || "-")}</small></td>
+            <td>${escapeHtml(doc.company || "-")}</td>
+            <td>${escapeHtml(doc.folderName || "-")}</td>
+            <td>${escapeHtml(doc.ownerName || doc.profileName || "-")}<small>${escapeHtml(doc.ownerEmail || doc.createdBy || "-")}</small></td>
+            <td>${escapeHtml(formatDateTime(doc.createdAt))}</td>
+            <td>${escapeHtml(formatDateTime(doc.updatedAt))}</td>
+            <td>${doc.copiedFrom ? `Recebido de ${escapeHtml(doc.copiedFrom.ownerName || doc.copiedFrom.ownerEmail || "-")}` : escapeHtml(doc.source || "-")}</td>
+            <td>${doc.deleted ? "Lixeira" : "Ativo"}</td>
+            <td>${managementDocumentActions(doc)}</td>
+          </tr>`).join("") || `<tr><td colspan="10"><div class="management-empty">${escapeHtml(empty)}</div></td></tr>`}</tbody>
+        </table></div>`;
+      }
+
+      function renderManagementDocuments() {
+        const docs = filterManagementDocuments(getManagementDocuments(), managementFilters.documents, managementFilters.documentType, managementFilters.documentStatus);
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head"><div><h2>Documentos STS</h2><p>Visao unificada de planos, checklists, documentos de texto e copias recebidas.</p></div><span class="management-status-badge">${docs.length} documento(s)</span></div>
+            <div class="management-filters">
+              <div class="management-filter"><label>Buscar documento</label><input data-management-filter="documents" value="${escapeAttr(managementFilters.documents)}" placeholder="Titulo, empresa, pasta, perfil..."></div>
+              <div class="management-filter"><label>Tipo</label><select data-management-filter="documentType"><option value="all">Todos</option><option value="planAction" ${managementFilters.documentType === "planAction" ? "selected" : ""}>Planos de Acao</option><option value="checklistPgr" ${managementFilters.documentType === "checklistPgr" ? "selected" : ""}>Checklists</option><option value="textDocument" ${managementFilters.documentType === "textDocument" ? "selected" : ""}>Docs de Texto</option><option value="received" ${managementFilters.documentType === "received" ? "selected" : ""}>Recebidos</option></select></div>
+              <div class="management-filter"><label>Status</label><select data-management-filter="documentStatus"><option value="all">Todos</option><option value="active" ${managementFilters.documentStatus === "active" ? "selected" : ""}>Ativos</option><option value="trash" ${managementFilters.documentStatus === "trash" ? "selected" : ""}>Na lixeira</option><option value="missingFolder" ${managementFilters.documentStatus === "missingFolder" ? "selected" : ""}>Sem pasta valida</option><option value="missingOwner" ${managementFilters.documentStatus === "missingOwner" ? "selected" : ""}>Sem dono</option></select></div>
+            </div>
+            ${renderManagementDocumentTable(docs)}
+          </section>`;
+      }
+
+      function renderManagementChecklists() {
+        const term = managementFilters.checklists;
+        const docs = filterManagementDocuments(getManagementChecklists(), term, "checklistPgr", "all");
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head"><div><h2>Checklists PGR</h2><p>Checklists salvos nas pastas do Eu Tecnico.</p></div><span class="management-status-badge">${docs.length} checklist(s)</span></div>
+            <div class="management-filters"><div class="management-filter"><label>Buscar checklist</label><input data-management-filter="checklists" value="${escapeAttr(term)}" placeholder="Empresa, setor, cargo, pasta..."></div></div>
+            ${renderManagementDocumentTable(docs, "Nenhum checklist encontrado.")}
+          </section>`;
+      }
+
+      function renderManagementTextDocuments() {
+        const term = managementFilters.textDocuments;
+        const docs = filterManagementDocuments(getManagementTextDocuments(), term, "textDocument", "all");
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head"><div><h2>Documentos de Texto</h2><p>Pareceres, comunicados, registros de visita e anotacoes tecnicas.</p></div><span class="management-status-badge">${docs.length} documento(s)</span></div>
+            <div class="management-filters"><div class="management-filter"><label>Buscar documento</label><input data-management-filter="textDocuments" value="${escapeAttr(term)}" placeholder="Titulo, conteudo, modelo, pasta..."></div></div>
+            ${renderManagementDocumentTable(docs, "Nenhum documento de texto encontrado.")}
+          </section>`;
+      }
+
+      function renderManagementCopyRequests() {
+        const term = normalizeText(managementFilters.copyRequests);
+        const status = managementFilters.copyRequestStatus;
+        const requests = getManagementCopyRequests().filter(request => {
+          if (status !== "all" && request.status !== status) return false;
+          if (term && !normalizeText(`${request.requesterName} ${request.requesterEmail} ${request.ownerName} ${request.ownerEmail} ${request.sourceDocumentTitle || request.sourceTitle} ${request.status}`).includes(term)) return false;
+          return true;
+        });
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head"><div><h2>Companheiros / Copias</h2><p>Auditoria das solicitacoes de copia entre usuarios.</p></div><span class="management-status-badge">${requests.length} solicitacao(oes)</span></div>
+            <div class="management-filters">
+              <div class="management-filter"><label>Buscar solicitacao</label><input data-management-filter="copyRequests" value="${escapeAttr(managementFilters.copyRequests)}" placeholder="Solicitante, dono, documento..."></div>
+              <div class="management-filter"><label>Status</label><select data-management-filter="copyRequestStatus"><option value="all">Todas</option><option value="pending" ${status === "pending" ? "selected" : ""}>Pendentes</option><option value="approved" ${status === "approved" ? "selected" : ""}>Aprovadas</option><option value="rejected" ${status === "rejected" ? "selected" : ""}>Recusadas</option><option value="cancelled" ${status === "cancelled" ? "selected" : ""}>Canceladas</option></select></div>
+            </div>
+            <div class="management-table-wrap"><table class="management-table"><thead><tr><th>Solicitante</th><th>Dono</th><th>Documento</th><th>Tipo</th><th>Pasta</th><th>Status</th><th>Criado</th><th>Resolvido</th><th>Acoes</th></tr></thead><tbody>
+              ${requests.map(request => `<tr><td><strong>${escapeHtml(request.requesterName || "-")}</strong><small>${escapeHtml(request.requesterEmail || "-")}</small></td><td><strong>${escapeHtml(request.ownerName || "-")}</strong><small>${escapeHtml(request.ownerEmail || "-")}</small></td><td>${escapeHtml(request.sourceDocumentTitle || request.sourceTitle || "-")}</td><td>${escapeHtml(request.sourceDocumentType || "-")}</td><td>${escapeHtml(request.sourceFolderName || request.sourceFolderId || "-")}</td><td>${escapeHtml(request.status || "-")}</td><td>${escapeHtml(formatDateTime(request.createdAt))}</td><td>${escapeHtml(formatDateTime(request.resolvedAt))}</td><td><button class="button" type="button" data-management-action="view-copy-request-metadata" data-request-id="${escapeAttr(request.id)}">Metadados</button></td></tr>`).join("") || '<tr><td colspan="9"><div class="management-empty">Nenhuma solicitacao encontrada.</div></td></tr>'}
+            </tbody></table></div>
+          </section>`;
+      }
+
+      function renderManagementTrash() {
+        const docs = filterManagementDocuments(getManagementTrashItems(), managementFilters.trash, "all", "trash");
+        els.managementContent.innerHTML = `
+          <section class="management-panel">
+            <div class="management-panel-head"><div><h2>Lixeira</h2><p>Itens excluidos de todos os perfis visiveis para a Gestao.</p></div><span class="management-status-badge">${docs.length} item(ns)</span></div>
+            <div class="management-filters"><div class="management-filter"><label>Buscar na lixeira</label><input data-management-filter="trash" value="${escapeAttr(managementFilters.trash)}" placeholder="Titulo, dono, pasta..."></div></div>
+            ${renderManagementDocumentTable(docs, "Nenhum item na lixeira.")}
+          </section>`;
+      }
+
+      function renderManagementTemplates() {
+        return renderManagementActionPlanTemplates();
+      }
+
+      function ensureManagementMetadataModal() {
+        let modal = document.getElementById("managementMetadataModal");
+        if (modal) return modal;
+        modal = document.createElement("section");
+        modal.className = "modal hidden";
+        modal.id = "managementMetadataModal";
+        modal.setAttribute("aria-modal", "true");
+        modal.setAttribute("role", "dialog");
+        modal.innerHTML = `
+          <div class="modal-card management-form-modal-card">
+            <div class="modal-head">
+              <h2 id="managementMetadataModalTitle">Metadados</h2>
+              <button class="button icon-only" type="button" data-management-metadata-close aria-label="Fechar">&times;</button>
+            </div>
+            <pre class="management-json-preview" id="managementMetadataModalBody"></pre>
+            <div class="modal-actions">
+              <button class="button" type="button" data-management-metadata-close>Fechar</button>
+            </div>
+          </div>`;
+        modal.querySelectorAll("[data-management-metadata-close]").forEach(button => {
+          button.addEventListener("click", () => closeModal("managementMetadataModal"));
+        });
+        modal.addEventListener("click", event => {
+          if (event.target === modal) closeModal("managementMetadataModal");
+        });
+        document.body.appendChild(modal);
+        return modal;
+      }
+
+      function openManagementMetadataModal(title, payload) {
+        const modal = ensureManagementMetadataModal();
+        modal.querySelector("#managementMetadataModalTitle").textContent = title || "Metadados";
+        modal.querySelector("#managementMetadataModalBody").textContent = JSON.stringify(payload || {}, null, 2);
+        openModal("managementMetadataModal");
+      }
+
+      function findManagementDocumentByDataset(dataset) {
+        const documentId = dataset.documentId || "";
+        const profileId = dataset.profileId || "";
+        const documentType = dataset.documentType || "";
+        if (!documentId) return null;
+        return getAllSTSManagementDocuments().find(doc => {
+          if (String(doc.id) !== String(documentId)) return false;
+          if (profileId && String(doc.profileId) !== String(profileId)) return false;
+          if (documentType && doc.type !== documentType) return false;
+          return true;
+        }) || null;
+      }
+
+      function openManagementDocument(doc) {
+        if (!doc) return showToast("Documento nao encontrado.", "warning");
+        const profile = app.profiles.find(item => String(item.id) === String(doc.profileId));
+        if (!profile) return showToast("Perfil do documento nao encontrado.", "warning");
+        if (doc.type === "planAction") {
+          const plan = (profile.plans || []).find(item => String(item.id) === String(doc.id)) || doc.raw;
+          if (!plan) return showToast("Plano de Acao nao encontrado.", "warning");
+          return openManagementPlan(profile, plan);
+        }
+        if (doc.deleted) {
+          openManagementMetadataModal(`${doc.typeLabel} na lixeira`, doc.raw || doc);
+          return showToast("Este documento esta na lixeira. Metadados abertos para conferencia.", "info");
+        }
+        const folder = (profile.folders || []).find(item => String(item.id) === String(doc.folderId));
+        if (!folder) {
+          openManagementMetadataModal(`${doc.typeLabel} sem pasta valida`, doc.raw || doc);
+          return showToast("Documento sem pasta valida. Confira os metadados antes de corrigir.", "warning");
+        }
+        openManagementFolder(profile, folder);
+        showToast(`Abrindo a pasta "${folder.name || "Sem pasta"}". Abra o ${doc.typeLabel} por la.`, "info", 5200);
       }
 
       function renderManagementProfiles() {
@@ -7884,7 +10541,7 @@ p { margin: 0 0 6pt; }
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "application/json,.json";
-        input.addEventListenerasync ("change", async () => {
+        input.addEventListener("change", async () => {
           const file = input.files?.[0];
           if (!file) return;
           try {
@@ -7955,14 +10612,14 @@ p { margin: 0 0 6pt; }
         const applied = suggestionDateParts(new Date());
         return `Parecer técnico:
 
-Após análise da sugestão encaminhada, foi verificado que a melhoria proposta é pertinente para o funcionamento do SATS e foi aceita para implementação.
+Após análise da sugestão encaminhada, foi verificado que a melhoria proposta é pertinente para o funcionamento do STS e foi aceita para implementação.
 
 A sugestão foi aplicada ao sistema com o objetivo de melhorar a experiência de uso, organização das informações e eficiência no fluxo de trabalho.
 
 Data da aplicação: ${applied.date}
 Dia: ${applied.weekday}
 Horário da aplicação: ${applied.time}
-Responsável pela aplicação: ${currentUser?.email || "Administrador SATS"}
+Responsável pela aplicação: ${currentUser?.email || "Administrador STS"}
 
 Agradecemos pela contribuição. A participação dos usuários ajuda diretamente na evolução do sistema.`;
       }
@@ -8769,7 +11426,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
 
       async function restoreDefaultActionPlanTemplate(template) {
         if (!template?.systemDefault || !requirePermission(canManageActionPlanTemplates, "Você não tem permissão para restaurar templates.")) return;
-        if (!await managementConfirm("Restaurar o template padrão original do SATS?")) return;
+        if (!await managementConfirm("Restaurar o template padrão original do STS?")) return;
         const restored = createDefaultActionPlanTemplate();
         const index = app.actionPlanTemplates.findIndex(item => item.id === template.id);
         app.actionPlanTemplates[index] = restored;
@@ -9142,7 +11799,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "application/json,.json";
-        input.addEventListenerasync ("change", async () => {
+        input.addEventListener("change", async () => {
           const file = input.files?.[0];
           if (!file) return;
           try {
@@ -9296,6 +11953,8 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         const profile = app.profiles.find(item => item.id === button.dataset.profileId);
         const plan = profile?.plans.find(item => item.id === button.dataset.planId);
         const folder = profile?.folders.find(item => item.id === button.dataset.folderId);
+        const managementDocument = findManagementDocumentByDataset(button.dataset);
+        const copyRequest = button.dataset.requestId ? getManagementCopyRequests().find(item => String(item.id) === String(button.dataset.requestId)) : null;
         const suggestionCard = button.closest("[data-improvement-id]");
         const suggestionId = suggestionCard?.dataset.improvementId || button.dataset.suggestionId || "";
         const suggestion = suggestionId ? app.improvementSuggestions.find(item => item.id === suggestionId) : null;
@@ -9312,6 +11971,10 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         const procedureNode = procedureReport && procedureReport.nodes[button.dataset.nodeId];
         const procedureEditActions = new Set(["new-physical-report", "duplicate-physical-report", "toggle-physical-report", "delete-physical-report", "restore-physical-report", "move-physical-report-up", "move-physical-report-down", "add-flow-node", "move-flow-node-up", "move-flow-node-down", "set-root-node", "duplicate-flow-node", "delete-flow-node", "add-flow-option", "delete-flow-option", "add-result-block", "delete-result-block", "discard-procedure-draft"]);
         if (procedureEditActions.has(action) && !canEditProcedureDrafts()) return showToast("Você não tem permissão para editar procedimentos.");
+
+        if (action === "open-document" && managementDocument) return openManagementDocument(managementDocument);
+        if (action === "view-document-metadata" && managementDocument) return openManagementMetadataModal(managementDocument.typeLabel, managementDocument.raw || managementDocument);
+        if (action === "view-copy-request-metadata" && copyRequest) return openManagementMetadataModal("Solicitacao de copia", copyRequest);
 
         if (action === "procedure-view") {
           activeProcedureAdminView = button.dataset.procedureView || "overview";
@@ -9539,6 +12202,47 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           recordAudit({ action: "Rodou diagnóstico", entityType: "system", entityId: SHARED_STATE_ID });
           return renderManagementDiagnostics();
         }
+        if (action === "recovery-enable") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          activateRecoveryMode("management");
+          showToast("Modo de recuperacao ativado. Supabase pausado.", "success", 6000);
+          return renderManagementRecovery();
+        }
+        if (action === "recovery-disable") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          if (!await openConfirmModal({ title: "Desativar recuperacao", message: "A sincronizacao com Supabase sera religada apos recarregar. Confirme somente se os dados locais foram conferidos.", requiredText: "DESATIVAR", confirmLabel: "Desativar", tone: "primary" })) return;
+          deactivateRecoveryMode();
+          return renderManagementRecovery();
+        }
+        if (action === "recovery-open") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return openRecoveryScreen();
+        }
+        if (action === "recovery-export-current") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          downloadCurrentStorageBackup("BACKUP_COMPLETO_ATUAL_STS");
+          return showToast("Backup completo gerado.", "success");
+        }
+        if (action === "recovery-show-local") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return openRecoveryStateViewer("local");
+        }
+        if (action === "recovery-show-remote") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return openRecoveryStateViewer("remote");
+        }
+        if (action === "recovery-show-conflicts") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return openRecoveryStateViewer("conflicts");
+        }
+        if (action === "recovery-self-test") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return openRecoverySelfTestViewer();
+        }
+        if (action === "recovery-diagnostics") {
+          if (normalizeEmail(currentUser?.email || "") !== SUPER_ADMIN_EMAIL) return showToast("Apenas o super admin pode acessar a recuperacao.", "danger");
+          return renderManagementRecovery();
+        }
         if (action === "repair-data") return repairCommonDataIssues();
 
         if (action === "locate-profile" && profile) return showToast(`Perfil: ${profile.name}\nEmpresa: ${profile.company || "-"}\nPlanos: ${getManagementPlansForProfile(profile).length}`);
@@ -9765,6 +12469,16 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
 
       function handleAppChoice(event) {
         const choice = event.currentTarget.dataset.appChoice;
+        if (choice === "euTecnico") {
+          selectedPortalApp = "euTecnico";
+          renderApp();
+          return;
+        }
+        if (choice === "crew") {
+          selectedPortalApp = "crew";
+          renderApp();
+          return;
+        }
         if (choice === "procedures") {
           selectedPortalApp = "procedures";
           renderApp();
@@ -9798,6 +12512,27 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         managementPlanEditContext = null;
         selectedActions.clear();
         renderApp();
+      }
+
+      function ensureEuTecnicoUsesPlanAction() {
+        let profile = findProfileByUser();
+        if (!profile) {
+          openProfileConflictScreen({ reason: "Eu Tecnico bloqueado: nenhum perfil seguro foi encontrado para o e-mail logado.", profiles: [] });
+          app.view = "profiles";
+          return;
+        }
+        ensureDefaultFolder(profile);
+        app.activeProfileId = profile.id;
+        if (!["folders", "trash", "editor"].includes(app.view)) app.view = "folders";
+        if (app.view === "profiles") app.view = "folders";
+        if (!getVisibleFolders(profile).some(folder => folder.id === app.activeFolderId)) {
+          const firstFolderWithPlans = getVisibleFolders(profile).find(folder => getActivePlans(profile).some(plan => (plan.folderId || DEFAULT_FOLDER_ID) === folder.id));
+          app.activeFolderId = firstFolderWithPlans?.id || DEFAULT_FOLDER_ID;
+        }
+        if (app.view === "editor" && !profile.plans.some(plan => plan.id === app.activePlanId)) {
+          app.activePlanId = null;
+          app.view = "folders";
+        }
       }
 
       function handlePortalMessage(event) {
@@ -10075,7 +12810,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         pendingSuggestionAttachment = null;
         saveApp({ improvements: true });
         renderAppSelectorImprovements();
-        showToast("Sugestão enviada. Obrigado por ajudar a melhorar o SATS!", "success");
+        showToast("Sugestão enviada. Obrigado por ajudar a melhorar o STS!", "success");
       }
 
       async function handleImprovementListClick(event) {
@@ -10224,7 +12959,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         if (!currentUser) return;
         if (blockRestrictedAdminAccess()) return;
         app.hiddenUserProfileIds = app.hiddenUserProfileIds.filter(userId => userId !== currentUser.id);
-        const profile = ensureSinglePrivateProfile();
+        const profile = findProfileByUser() || createEmptyCurrentUserProfileSafely();
         if (!profile) {
           showToast("Não foi possível criar o perfil deste usuário. Atualize a página e tente novamente.");
           return;
@@ -10436,6 +13171,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           app.profiles.push(savedProfile);
         }
         recordProfileActivity(previousProfile, savedProfile);
+        if (currentUser) cacheProfileAvatar(currentUser, savedProfile);
         saveApp({ profileId: savedProfile.id });
         if (savedProfile && currentUser && savedProfile.userId === currentUser.id) {
           await syncOwnPublicProfile(savedProfile);
@@ -11029,6 +13765,14 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
             folder.name = name;
             folder.color = selectedFolderColor;
             if (isSystemAdminUser()) folder.hidden = document.getElementById("folderHiddenInput").checked;
+            folder.updatedAt = new Date().toISOString();
+            folder.createdBy = folder.createdBy || normalizeEmail(profile.email || currentUser?.email || "");
+            folder.ownerEmail = folder.ownerEmail || normalizeEmail(profile.email || currentUser?.email || "");
+            folder.userEmail = folder.userEmail || normalizeEmail(profile.email || currentUser?.email || "");
+            folder.profileId = folder.profileId || profile.id || "";
+            folder.ownerProfileId = folder.ownerProfileId || profile.id || "";
+            folder.ownerName = folder.ownerName || profile.name || currentUser?.email || "";
+            folder.profileName = folder.profileName || profile.name || "";
             recordActivity("Editou pasta", `Pasta ${oldName} alterada para ${folder.name}.`, { profile });
           }
         } else {
@@ -11041,7 +13785,15 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
             clientId: profile.clientId || "",
             unitId: profile.unitId || "",
             sectorId: profile.sectorId || "",
-            createdAt: new Date().toISOString()
+            createdBy: normalizeEmail(profile.email || currentUser?.email || ""),
+            ownerEmail: normalizeEmail(profile.email || currentUser?.email || ""),
+            userEmail: normalizeEmail(profile.email || currentUser?.email || ""),
+            profileId: profile.id || "",
+            ownerProfileId: profile.id || "",
+            ownerName: profile.name || currentUser?.email || "",
+            profileName: profile.name || "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           };
           profile.folders.push(folder);
           recordActivity("Criou pasta", `Criou a pasta ${folder.name}.`, { profile });
@@ -11150,6 +13902,12 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           company,
           documentType,
           folderId,
+          createdBy: normalizeEmail(profile.email || currentUser?.email || ""),
+          ownerEmail: normalizeEmail(profile.email || currentUser?.email || ""),
+          userEmail: normalizeEmail(profile.email || currentUser?.email || ""),
+          profileId: profile.id || "",
+          ownerProfileId: profile.id || "",
+          ownerName: profile.name || currentUser?.email || "",
           createdAt: now,
           updatedAt: now,
           clientId: profile.clientId || "",
@@ -12561,7 +15319,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         doc.setProperties({
           title: `CRONOGRAMA DE AÇÕES - ${company}`,
           subject: "Relatório executivo de cronograma de ações SST",
-          creator: "SATS"
+          creator: "STS"
         });
 
         let y = await drawPdfHeader(doc, plan, meta, generatedAt);
@@ -12989,7 +15747,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           doc.setTextColor(100, 116, 139);
           doc.setFont("helvetica", "normal");
           doc.setFontSize(7);
-          doc.text("SATS", 10, height - 5);
+          doc.text("STS", 10, height - 5);
           doc.text(`Página ${page} de ${pageCount}`, width - 10, height - 5, { align: "right" });
         }
       }
@@ -13118,7 +15876,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
   ${wordTable("Ações", ["Item", "Ação recomendada", "Responsável", "Quando", "Prioridade", "Status", "Observação"], actionRows)}
   ${wordTable("Equipamentos de emergência", ["Item", "Descrição", "Responsável"], equipmentRows)}
   ${wordTable("Treinamentos", ["Item", "Treinamento", "Responsável", "Quando"], trainingRows)}
-  <div class="word-footer">SATS - Plano de Ação | Última edição: ${escapeHtml(formatDateTime(plan.updatedAt))}</div>
+  <div class="word-footer">STS - Plano de Ação | Última edição: ${escapeHtml(formatDateTime(plan.updatedAt))}</div>
 </div>
 </body>
 </html>`;
@@ -13434,7 +16192,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         ctx.fillStyle = "#64748b";
         ctx.font = "700 14px Segoe UI, Arial, sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("SATS - Exportação JPEG A4", margin, ctx.canvas.height - 24);
+        ctx.fillText("STS - Exportação JPEG A4", margin, ctx.canvas.height - 24);
         ctx.textAlign = "right";
         ctx.fillText(`Página ${String(pageNumber).padStart(2, "0")} de ${String(totalPages).padStart(2, "0")}`, width - margin, ctx.canvas.height - 24);
         ctx.textAlign = "left";
@@ -13736,7 +16494,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         if (blockRestrictedAdminAccess()) return;
         const payload = {
           exportedAt: new Date().toISOString(),
-          app: "SATS",
+          app: "STS",
           version: 2,
           ...app
         };
@@ -13973,6 +16731,11 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       function saveApp(options = {}) {
         pruneSystemStorage();
         if (!options.skipTrashPurge) purgeExpiredTrashPlans({ trackDeletes: true });
+        if (isProfileConflictReadOnlyMode() && !options.localOnly) {
+          egressDiag("saveApp bloqueado por modo somente leitura de conflito", { options: Object.keys(options) });
+          renderRecoveryBanner("Modo somente leitura por conflito de perfil. Resolva o conflito antes de salvar alteracoes.");
+          return;
+        }
         const key = currentUser ? SHARED_STORAGE_KEY : STORAGE_KEY;
         localStorage.setItem(key, JSON.stringify(app));
         if (!isHydrating) lastLocalChangeAt = Date.now();
@@ -14019,6 +16782,11 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           if (!options.fullSave && !options.improvements && !options.deleteProfileId && !options.profileId && !pureActivitySave && app.activeProfileId) {
             dirtyProfileIds.add(app.activeProfileId);
           }
+        }
+        if (isRecoveryModeActive()) {
+          egressDiag("saveApp manteve alteracao somente local por modo recuperacao", { options: Object.keys(options) });
+          renderRecoveryBanner();
+          return;
         }
         if (!currentUser || !cloudReady || isHydrating || options.localOnly || !hasPendingCloudChanges()) return;
         scheduleCloudSave();
@@ -14083,6 +16851,11 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       }
 
       function scheduleCloudSave() {
+        if (isRecoveryModeActive()) {
+          egressDiag("scheduleCloudSave bloqueado por modo recuperacao");
+          renderRecoveryBanner();
+          return;
+        }
         egressDiag("scheduleCloudSave disparado", {
           pending: snapshotDiag(),
           caller: egressDiagCaller()
@@ -14110,6 +16883,11 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       }
 
       async function saveAppToCloud(options = {}) {
+        if (isRecoveryModeActive()) {
+          egressDiag("saveAppToCloud bloqueado por modo recuperacao", { source: options.source || "direct" });
+          renderRecoveryBanner();
+          return;
+        }
         egressDiag("saveAppToCloud chamada", {
           source: options.source || "direct",
           pending: snapshotDiag(),
@@ -14156,6 +16934,14 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         let savedCloudOk = false;
         try {
           const mergedData = await buildMergedCloudData(snapshot);
+          const outboundDiagnostics = runIntegrityDiagnostics(mergedData);
+          if (outboundDiagnostics.hasErrors) {
+            console.warn("[STS] Envio ao Supabase bloqueado por conflito grave no estado local:", outboundDiagnostics);
+            requeuePendingCloudSnapshot(snapshot);
+            renderRecoveryBanner("Sincronizacao pausada: o estado local possui conflito grave e nao sera enviado ao Supabase.");
+            showToast("Sincronizacao pausada: conflito grave detectado antes do envio ao Supabase.", "danger", 8000);
+            return;
+          }
           const { data, error } = await supabaseClient
             .from("shared_states")
             .upsert({
@@ -14206,7 +16992,20 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           lastSharedUpdatedAt
         });
         const row = await fetchSharedStateFull({ source: "buildMergedCloudData" });
-        const latest = row && row.data ? normalizeApp(row.data) : createEmptyApp();
+        let latest = row && row.data ? normalizeApp(row.data) : null;
+        if (!latest) {
+          egressDiag("buildMergedCloudData sem data remoto; usando estado local como base protegida");
+          recordActivity("Supabase indisponivel", "NÃ£o foi possÃ­vel baixar o estado completo remoto antes do merge; usando estado local como base protegida.");
+          latest = normalizeApp(sharedAppData(app));
+        } else {
+          const remoteSafety = isRemoteStateSafeToApply(app, latest);
+          if (!remoteSafety.safe) {
+            egressDiag("buildMergedCloudData recusou remoto inseguro antes do merge", { reason: remoteSafety.reason });
+            recordActivity("Recusou estado remoto corrompido", `Merge bloqueado: ${remoteSafety.reason}`);
+            renderRecoveryBanner(`Sincronizacao pausada: ${remoteSafety.reason}`);
+            latest = normalizeApp(sharedAppData(app));
+          }
+        }
         const deleteIds = new Set(snapshot.deletedProfileIds.filter(Boolean));
         const deletedPlanIds = new Set((snapshot.deletedPlanIds || []).filter(Boolean));
         const deletedFolderIds = new Set((snapshot.deletedFolderIds || []).filter(Boolean));
@@ -14302,6 +17101,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           lastAccess: isSameOrNewer(local.lastAccess, remote.lastAccess) ? local.lastAccess : remote.lastAccess,
           createdAt: remote.createdAt || local.createdAt,
           folders: mergeFoldersForCloud(remote.folders, local.folders, options.deletedFolderIds || new Set()),
+          documents: mergeProfileDocumentsForCloud(remote.documents, local.documents),
           plans: mergePlansForCloud(remote.plans, local.plans, {
             deletedPlanIds: options.deletedPlanIds || new Set(),
             deletedFolderIds: options.deletedFolderIds || new Set(),
@@ -14325,6 +17125,16 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         const merged = Array.from(map.values());
         if (!merged.some(folder => folder.id === DEFAULT_FOLDER_ID)) merged.unshift(createDefaultFolder());
         return merged;
+      }
+
+      function mergeProfileDocumentsForCloud(remoteDocuments, localDocuments) {
+        const map = new Map();
+        [...(remoteDocuments || []), ...(localDocuments || [])].forEach(document => {
+          const normalized = normalizeProfileDocument(document);
+          const current = map.get(normalized.id);
+          if (!current || isSameOrNewer(normalized.updatedAt, current.updatedAt)) map.set(normalized.id, normalized);
+        });
+        return Array.from(map.values()).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
       }
 
       function mergePlansForCloud(remotePlans, localPlans, options) {
@@ -14407,6 +17217,12 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       }
 
       function startSharedSync(options = {}) {
+        if (isRecoveryModeActive()) {
+          egressDiag("startSharedSync bloqueado por modo recuperacao", { source: options.source || "unknown" });
+          stopSharedSync();
+          renderRecoveryBanner();
+          return;
+        }
         egressDiag("startSharedSync chamado", {
           hadTimer: !!syncTimer,
           hadChannel: !!realtimeChannel,
@@ -14442,6 +17258,10 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       }
 
       function subscribeRealtime() {
+        if (isRecoveryModeActive()) {
+          egressDiag("realtime bloqueado por modo recuperacao");
+          return;
+        }
         if (!supabaseClient || !currentUser) return;
         if (realtimeChannel) {
           egressDiag("subscribeRealtime removeu canal antigo antes de criar novo");
@@ -14502,6 +17322,11 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       }
 
       async function syncSharedStateFromCloud(options = {}) {
+        if (isRecoveryModeActive()) {
+          egressDiag("syncSharedStateFromCloud bloqueado por modo recuperacao", { source: options.source || "unknown" });
+          renderRecoveryBanner();
+          return;
+        }
         egressDiag("syncSharedStateFromCloud chamada", {
           source: options.source || "unknown",
           force: !!options.force,
@@ -14584,10 +17409,24 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
 
       async function applyRemoteSharedState(row, options = {}) {
         if (!row || !row.data) return;
+        if (isRecoveryModeActive()) {
+          egressDiag("applyRemoteSharedState bloqueado por modo recuperacao");
+          renderRecoveryBanner();
+          return;
+        }
         if (row.updated_at && row.updated_at === lastSharedUpdatedAt) return;
         if (!options.force && hasRecentLocalActivity()) return;
         if (!options.allowWhileEditing && isUserEditing()) return;
-        app = restoreLocalNavigation(normalizeApp(row.data), captureLocalNavigation());
+        const remote = normalizeApp(row.data);
+        const safety = isRemoteStateSafeToApply(app, remote);
+        if (!safety.safe) {
+          console.warn("[STS] Atualizacao remota recusada:", safety.reason, safety.diagnostics);
+          recordActivity("Recusou estado remoto corrompido", safety.reason);
+          renderRecoveryBanner(`Sincronizacao pausada: ${safety.reason}`);
+          showToast(`Sincronizacao pausada: ${safety.reason}`, "warning", 7000);
+          return;
+        }
+        app = restoreLocalNavigation(remote, captureLocalNavigation());
         lastSharedUpdatedAt = row.updated_at || "";
         writeLocalSharedCache(app, lastSharedUpdatedAt);
         selectedActions.clear();
@@ -14928,13 +17767,43 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
       function exposeSatsRuntime() {
         Object.assign(window.SATS.core, {
           version: APP_VERSION,
-          get app() { return app; },
-          get currentUser() { return currentUser; },
-          get selectedPortalApp() { return selectedPortalApp; },
           renderApp,
           handleAppChoice,
           showAppSelector,
-          logout
+          logout,
+          createId,
+          normalizeText,
+          recordActivity,
+          downloadBlob,
+          sanitizeFileName,
+          getVisibleTeamProfiles,
+          normalizeActionPlanTemplates,
+          cloneTemplateRows,
+          cloneTemplateEquipmentRows,
+          cloneTemplateTrainingRows,
+          createPlanData,
+          normalizePlan,
+          openProfileModal,
+          findProfileByUser,
+          updatePostLoginLoadingAvatar
+        });
+
+        Object.defineProperties(window.SATS.core, {
+          app: {
+            configurable: true,
+            enumerable: true,
+            get() { return app; }
+          },
+          currentUser: {
+            configurable: true,
+            enumerable: true,
+            get() { return currentUser; }
+          },
+          selectedPortalApp: {
+            configurable: true,
+            enumerable: true,
+            get() { return selectedPortalApp; }
+          }
         });
 
         Object.assign(window.SATS.storage, {
@@ -14943,6 +17812,18 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           sharedAppData,
           normalizeApp,
           createEmptyApp
+        });
+
+        window.SATS.recovery = window.SATS.recovery || {};
+        Object.assign(window.SATS.recovery, {
+          isRecoveryModeActive,
+          openRecoveryScreen,
+          runIntegrityDiagnostics,
+          isRemoteStateSafeToApply,
+          resolveCurrentUserProfileSafely,
+          extractSharedStateFromBackup,
+          stateStats,
+          runRecoverySelfTests
         });
 
         Object.assign(window.SATS.ui, {
@@ -14969,6 +17850,9 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
 
         window.SATS.router.openModule = function openModule(moduleName) {
           const map = {
+            menu: null,
+            euTecnico: "euTecnico",
+            crew: "crew",
             planAction: "plans",
             procedures: "procedures",
             management: "management",
@@ -14979,6 +17863,36 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
           renderApp();
         };
         window.SATS.router.showAppSelector = showAppSelector;
+
+        window.SATS.modules.menu = Object.assign(window.SATS.modules.menu || {}, {
+          name: "MENU",
+          init() {},
+          open() { showAppSelector(); },
+          close() {},
+          render: renderAppSelector,
+          save: saveApp,
+          destroy() {}
+        });
+
+        window.SATS.modules.euTecnico = Object.assign(window.SATS.modules.euTecnico || {}, {
+          name: "Eu Técnico",
+          init() {},
+          open() { selectedPortalApp = "euTecnico"; renderApp(); },
+          close() {},
+          render: renderEuTecnico,
+          save: saveApp,
+          destroy() {}
+        });
+
+        window.SATS.modules.crew = Object.assign(window.SATS.modules.crew || {}, {
+          name: "Companheiros de Tripulação",
+          init() {},
+          open() { selectedPortalApp = "crew"; renderApp(); },
+          close() {},
+          render: renderCrew,
+          save: saveApp,
+          destroy() {}
+        });
 
         window.SATS.modules.planAction = Object.assign(window.SATS.modules.planAction || {}, {
           name: "Plano de Ação",
@@ -15001,7 +17915,7 @@ Agradecemos pela contribuição. A participação dos usuários ajuda diretament
         });
 
         window.SATS.modules.management = Object.assign(window.SATS.modules.management || {}, {
-          name: "Gestão SATS",
+          name: "Gestão STS",
           init() {},
           open() { selectedPortalApp = "management"; renderApp(); },
           close() {},

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">STS - Suporte Técnico de Segurança</title>
+  <defs>
+    <linearGradient id="stsBlueDark" x1="18" y1="112" x2="108" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a66df"/>
+      <stop offset=".55" stop-color="#19a8ff"/>
+      <stop offset="1" stop-color="#d8edff"/>
+    </linearGradient>
+    <linearGradient id="stsGreenDark" x1="36" y1="80" x2="75" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17c653"/>
+      <stop offset="1" stop-color="#68f08b"/>
+    </linearGradient>
+    <filter id="stsIconGlowDark" x="-24" y="-24" width="176" height="176" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#0b8fff" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" fill="none"/>
+  <g filter="url(#stsIconGlowDark)">
+    <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="#071426" stroke="#d8edff" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="none" stroke="url(#stsBlueDark)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M47 36h31l15 15v42H47Z" fill="#0c1d32" stroke="#d8edff" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M78 36v16h15" fill="#19a8ff" stroke="#19a8ff" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m39 61 8 8 15-17" fill="none" stroke="url(#stsGreenDark)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M64 64h21M64 80h21M34 82l8 8 13-14" fill="none" stroke="#d8edff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30 99h22M24 86h15M19 73h16" fill="none" stroke="#19a8ff" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="52" cy="99" r="4" fill="#17c653"/>
+    <circle cx="24" cy="86" r="4" fill="#19a8ff"/>
+    <circle cx="19" cy="73" r="4" fill="#19a8ff"/>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">STS - Suporte Técnico de Segurança</title>
+  <defs>
+    <linearGradient id="stsBlueLight" x1="18" y1="112" x2="108" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0757c9"/>
+      <stop offset=".55" stop-color="#1097ff"/>
+      <stop offset="1" stop-color="#0f2742"/>
+    </linearGradient>
+    <linearGradient id="stsGreenLight" x1="36" y1="80" x2="75" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#15b84a"/>
+      <stop offset="1" stop-color="#49d86e"/>
+    </linearGradient>
+    <filter id="stsIconShadowLight" x="-16" y="-16" width="160" height="160" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f2742" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" fill="none"/>
+  <g filter="url(#stsIconShadowLight)">
+    <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="#ffffff" stroke="#0f2742" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="none" stroke="url(#stsBlueLight)" stroke-width="4" stroke-linejoin="round" opacity=".9"/>
+    <path d="M47 36h31l15 15v42H47Z" fill="#f8fbff" stroke="#0f2742" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M78 36v16h15" fill="#1097ff" stroke="#1097ff" stroke-width="4" stroke-linejoin="round"/>
+    <path d="m39 61 8 8 15-17" fill="none" stroke="url(#stsGreenLight)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M64 64h21M64 80h21M34 82l8 8 13-14" fill="none" stroke="#0f2742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30 99h22M24 86h15M19 73h16" fill="none" stroke="#0b8fff" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="52" cy="99" r="4" fill="#15b84a"/>
+    <circle cx="24" cy="86" r="4" fill="#0b8fff"/>
+    <circle cx="19" cy="73" r="4" fill="#0b8fff"/>
+  </g>
+</svg>
