@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" role="img" aria-labelledby="title">
+  <title id="title">STS - Suporte Técnico de Segurança</title>
+  <defs>
+    <linearGradient id="stsWordBlueLight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12304f"/>
+      <stop offset=".55" stop-color="#0b8fff"/>
+      <stop offset="1" stop-color="#071426"/>
+    </linearGradient>
+    <linearGradient id="stsLineLight" x1="190" y1="172" x2="720" y2="172" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b8fff"/>
+      <stop offset=".7" stop-color="#0b8fff"/>
+      <stop offset="1" stop-color="#18b84d"/>
+    </linearGradient>
+  </defs>
+  <rect width="760" height="220" fill="none"/>
+  <g transform="translate(24 24) scale(1.35)">
+    <svg id="stsIconLight" width="128" height="128" viewBox="0 0 128 128">
+      <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="#fff" stroke="#0f2742" stroke-width="8" stroke-linejoin="round"/>
+      <path d="M64 11 104 27v34c0 27-15 48-40 58-25-10-40-31-40-58V27Z" fill="none" stroke="#0b8fff" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M47 36h31l15 15v42H47Z" fill="#f8fbff" stroke="#0f2742" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M78 36v16h15" fill="#1097ff" stroke="#1097ff" stroke-width="4" stroke-linejoin="round"/>
+      <path d="m39 61 8 8 15-17" fill="none" stroke="#18b84d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M64 64h21M64 80h21M34 82l8 8 13-14" fill="none" stroke="#0f2742" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M30 99h22M24 86h15M19 73h16" fill="none" stroke="#0b8fff" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="52" cy="99" r="4" fill="#18b84d"/>
+      <circle cx="24" cy="86" r="4" fill="#0b8fff"/>
+      <circle cx="19" cy="73" r="4" fill="#0b8fff"/>
+    </svg>
+  </g>
+  <g transform="translate(210 26)">
+    <text x="0" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="900" font-style="italic" letter-spacing="-4" fill="#0f2742">S</text>
+    <text x="144" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="900" font-style="italic" letter-spacing="-4" fill="#0b8fff">T</text>
+    <text x="300" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="900" font-style="italic" letter-spacing="-4" fill="#0f2742">S</text>
+    <path d="M0 116h534" stroke="url(#stsLineLight)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="332" cy="116" r="8" fill="#fff" stroke="#0b8fff" stroke-width="5"/>
+    <text x="0" y="170" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="650" fill="#0f2742">Suporte Técnico de Segurança</text>
+  </g>
+</svg>
